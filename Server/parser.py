@@ -61,24 +61,3 @@ if __name__ == "__main__":
         "add-tags": queries.AddTags,
         "delete-tags": queries.DeleteTags,
 })
-
-######################## TESTING ########################
-# def test_Saving_Files():
-#     db = StartDB()
-#     with open("tests/texto.txt", 'rb') as file:
-#         file_content = file.read()
-#         SaveFile(file_name="texto.txt", file_content=file_content)
-#         recovery_content = File.get(name="texto.txt").file_content
-#         self.assertEqual(file_content, recovery_content)
-#     db.close()
-# def test_Multiple_Files():
-#     db = StartDB()
-#     curr_dir = os.getcwd()+ '\\tests'
-#     test_files = {}
-#     for f in [fil for fil in os.listdir(curr_dir) if (os.path.isfile(os.path.join(curr_dir, fil)) and os.path.splitext(fil)[1] == ".txt")]:
-#         print(f)
-#         with open(os.path.join(curr_dir, f), 'rb') as file:
-#             file_content = file.read()
-#             test_files[f] = file_content
-#     AddFiles(*["Fotos_con_mi_madre", "vacaciones", "viajes", "playa", "familia"], **test_files)
-#     db.close()
