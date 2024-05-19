@@ -86,11 +86,11 @@ def AddTags(tag_query, tags):
 
 def DeleteTags(tag_query, tags):
     files_query = RecoverFiles_ByTagQuery(tag_query)
-    print(f"files match in DB: {files_query}")
-    print(f"tags to delete(raw query): {tags}")
+    # print(f"files match in DB: {files_query}")                                              # DEBUG
+    # print(f"tags to delete(raw query): {tags}")                                             # DEBUG
     for file_name in files_query:
         filtered_filetags_to_delete = [file_tag for file_tag in FileTag.select(FileTag).join(Tag).where(FileTag.file == file_name).where(Tag.name.in_(tags))]
-        print(f"tags to delete for {file_name}(filtered): {filtered_filetags_to_delete}")
+        # print(f"tags to delete for {file_name}(filtered): {filtered_filetags_to_delete}")   # DEBUG
         FileTag.delete().where(FileTag.id.in_(filtered_filetags_to_delete)).execute()
             
 
