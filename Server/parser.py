@@ -5,7 +5,7 @@ from DB import DB
 
 
 def exec_command(prompt:str, actions:dict):
-    # Separa la expresion inicial en varias expresiones hasta desglosarlo en listas de elementos y elementos.
+    """Separa la expresion inicial en varias expresiones hasta desglosarlo en listas de elementos y en elementos."""
     exp = r'^(?P<command>[\w\-]+)\s+(?P<rest>.*)'
     exp_args = r'(?P<arg1_list>[\w_\.\|]+) (\s?)+ (?P<arg2_list>[\w_\|]+)?'
     exp_list = r'(?P<tag>[\w_\.]+)\| | \|?(?P<tag1>[\w_\.]+)'

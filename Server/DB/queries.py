@@ -10,6 +10,7 @@ def AddFiles(files, tags):
             SaveFile(file_name, file_content, *tags)
 
 def SaveFile(file_name, file_content, *tags):
+    """Salvar un archivo en la BD con determinadas etiquetas: tags"""
     tags_query = Tag.select(Tag).where(Tag.name.in_(tags))
     tags_query_names = [tag.name for tag in tags_query]
     print(f"tag_query: {tags_query}")
@@ -25,7 +26,7 @@ def SaveFile(file_name, file_content, *tags):
 
 
 def RecoverFiles_ByTagQuery(tag_query, arg2=None):
-    # Obtener los archivos con TODOS los tags de la lista de tags: tag_query
+    """Obtener los archivos con TODOS los tags de la lista de tags: tag_query"""
 
     # 1. Hacer Join entre las 3 tablas
     # 2. Coger todas las tuplas de archivo-tag que tengan su tag en tag_query
