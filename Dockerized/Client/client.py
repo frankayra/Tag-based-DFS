@@ -1,27 +1,35 @@
 
+import time
+import os
+import sys
+import asyncio
+from pathlib import Path
+sys.path.append('../')
 
 from flask import Flask, jsonify
 from flask_cors import CORS
 import grpc
 
-# import sys
-# sys.path.append('../')
 from gRPC import communication_pb2 as communication_messages
 from gRPC import communication_pb2_grpc as communication
-from parser import exec_command, RunPrompt
+
+from Client.parser import exec_command, RunPrompt
 
 ######################### TERMINAL SERVER #########################
 
-def actions(action: str, arg1_list, arg2_list):
+async def actions(action: str, arg1_list, arg2_list):
     with grpc.insecure_channel('localhost:50051') as channel:
         stub = communication.ClientAPIStub(channel)
         match action:
             case 'add':
                 files=[]
                 for file_name in arg1_list:
+                    if not Path(file_name).exists():
+                        print(f"Cliente: No se encontro la ruta al archivo: '{file_name}'.")
+                        continue
                     with open(file_name, 'rb') as file:
                         file_content = file.read()
-                        communication_messages.FileContent(title=file_name, content=file_content)
+                        files.append(communication_messages.FileContent(title=file_name, content=file_content))
                 response = stub.addFiles(communication_messages.FilesToAdd(files=files, tags=arg2_list))
                 return f'response.success: {response.success}\nresponse.message: {response.message}'
             case 'add-tags':
@@ -29,44 +37,109 @@ def actions(action: str, arg1_list, arg2_list):
                 return f'response.success: {response.success}\nresponse.message: {response.message}'
             case 'delete':
                 response = stub.delete(communication_messages.TagList(tags=arg1_list))
+
                 return f'response.success: {response.success}\nresponse.message: {response.message}'
             case 'delete-tags':
-                response = stub.addTags(communication_messages.TagQuery(tags_query=arg1_list, operation_tags=arg2_list))
+                response = stub.deleteTags(communication_messages.TagQuery(tags_query=arg1_list, operation_tags=arg2_list))
                 return f'response.success: {response.success}\nresponse.message: {response.message}'
 
-                
+               
                 
             case 'list':
+                print("Listing...")
                 response = stub.list(communication_messages.TagList(tags=arg1_list))
+                result = ""
                 for file_info in response:
-                    files_locations_hashs[file_info.location.file_hash] = file_info.location.location_hash
-                    return f"{file_info.location.file_hash} -> \"{file_info.title}\"      {file_info.tag_list}"
+                    if file_info.location.file_hash == "-1":
+                        return "no files found"
+                    cache[file_info.location.file_hash] = (file_info.title, file_info.location.location_hash)
+                    result+=f"{file_info.location.file_hash} -> \"{file_info.title}\"      {file_info.tag_list}\n"
+                
+
+                return result
             case 'file-content':
-                location_hash=files_locations_hashs.get(arg1_list[0], None)
-                if not location_hash:
+                file_name, location_hash = cache[arg1_list[0]]
+                
+                if not file_name:
                     return "No se ha recuperado tal archivo, para acceder a el tene que haber sido recuperado en esta sesion"
 
                 response = stub.fileContent(communication_messages.FileLocation(file_hash=arg1_list[0], location_hash=location_hash))
-                return f"\n   > \"{response.title}\" \n{response.content}"
-                    
+                if not response.title and not response.content:
+                    return f"\nNo se encontro el archivo especificado('{file_name}'), este fue movido o eliminado de la BD."
+                return f"\n   📰: \"{response.title}\" \n{response.content}"
+
+            case 'cache':
+                os.system('cls')
+                print("\n\nCache --------------------------------")
+                for (file_hash, file_name, file_location_hash) in cache:
+                    print(f"  | > file hash: {file_hash}    name: {file_name}    location hash: {file_location_hash}")
+                print("    -----------------------------------\n")
+                return ""
+            case 'clear-cache':
+                cache.clear()
+                return "Cache cleared successfully"
             case _:
                 return "No se reconoce el comando"
             
 
 
-def RunTerminalServer():
-    global files_locations_hashs
-    files_locations_hashs = {}
-    RunPrompt(commands={
+async def RunTerminalClient():
+    global cache
+    cache = Cache()
+    await RunPrompt(commands={
         'add': actions,
         'list': actions,
         'delete': actions,
         'add-tags': actions,
-        'delete-tags': actions
+        'delete-tags': actions,
+        "file-content": actions,
+        'cache': actions,
+        'clear-cache': actions,
     })
+class Cache:
+    def __init__(self, capacity=10):
+        self.capacity = capacity
+        self.files_hashs = []
+        self.files_locations_hashs = {}
+        self.files_names_hashs = {}
+    def __getitem__(self, file_hash:str):
+        return (self.files_names_hashs.get(file_hash, None), self.files_locations_hashs.get(file_hash, None))
+    def __setitem__(self, file_hash:str, file_name_location_tuple:tuple) -> None:
+        file_name, file_location_hash = file_name_location_tuple[0], file_name_location_tuple[1]
+        if file_hash in self.files_hashs:
+            if file_name == self.files_names_hashs[file_hash]: return
+        else: self.files_hashs.append(file_hash)
+        self.files_locations_hashs[file_hash] = file_location_hash
+        self.files_names_hashs[file_hash] = file_name
+        if len(self.files_hashs) > self.capacity:
+            file_hash_to_remove = self.files_hashs.pop(0)
+            del self.files_locations_hashs[file_hash_to_remove]
+            del self.files_names_hashs[file_hash_to_remove]
+    def __len__(self):
+        return len(self.cache)
+    def __iter__(self):
+        return ((file_hash, self.files_names_hashs[file_hash], self.files_locations_hashs[file_hash]) for file_hash in self.files_hashs)
+    def delete_item(self, file_hash):
+        if file_hash in self.files_hashs:
+            file_name = self.files_names_hashs[file_hash]
+            del self.files_hashs[file_hash]
+            del self.files_names_hashs[file_hash]
+            del self.files_locations_hashs[file_hash]
+            print(f"cache actualizada")
+        else:
+            print()
+    def clear(self):
+        self.files_hashs.clear()
+        self.files_names_hashs.clear()
+        self.files_locations_hashs.clear()
 
 
-
+if __name__ == '__main__':
+    print("--------------------------------------------------------------------------- Nueva terminal")
+    asyncio.run(RunTerminalClient())
+    # actions('add', ['Dockerfile'], ['archivo', 'docker', 'proyecto'])
+    # actions('list', ['archivo'], [])
+    pass
 
 
 

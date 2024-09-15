@@ -16,7 +16,7 @@ def get_File_Tag_DB(db_name:str):
         file_hash = CharField(primary_key=True)
         name = CharField()
         content = BlobField()
-        location_hash = IntegerField(constraints=[Check('location_hash >= 0')])
+        location_hash = CharField(index=True)
         
     class Tag(BaseModel):
         name = CharField(unique=True)  # Convierte en unico el campo 'name' en la tabla
