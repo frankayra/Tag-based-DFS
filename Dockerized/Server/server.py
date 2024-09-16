@@ -1,6 +1,6 @@
 import time
-import sys
-sys.path.append('../')
+# import sys
+# sys.path.append('../')
 import random
 from hashlib import sha1
 import socket
@@ -11,9 +11,9 @@ import logging
 import grpc
 
 
-import gRPC.communication_pb2 as communication_messages
-import gRPC.communication_pb2_grpc as communication
-from Server.DB import File_Tag_DB
+from gRPC import communication_pb2 as communication_messages
+from gRPC import communication_pb2_grpc as communication
+from DB import File_Tag_DB
 class ChordNodeReference:
     def __init__(self, ip:str, port:int):
         self.id = 0

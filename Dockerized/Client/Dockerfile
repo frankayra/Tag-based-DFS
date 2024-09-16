@@ -5,15 +5,11 @@ FROM python:3.12.5-slim
 WORKDIR /app
 
 # Copiar los archivos del proyecto al contenedor
-COPY . .
-
-# Instalar pipreqs para detectar dependencias
-RUN pip install pipreqs
-
-# Generar requirements.txt con pipreqs
-RUN pipreqs . --force
+COPY . /app
+COPY requirements.txt /app
 
 # Instalar dependencias listadas en requirements.txt
+RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
 # EXPOSE 3000

@@ -1,0 +1,15 @@
+version: '3'
+services:
+  ds-server:
+    image: ds-centralized-server
+    container_name: ds-centralized-server-container
+    ports:
+      - "50051:50051"
+
+  ds-client:
+    image: ds-client
+    container_name: ds-client-container
+    stdin_open: true  # Habilitar el uso de la terminal interactiva
+    tty: true         # Asignar una terminal para la interacción
+    depends_on:
+      - ds-server

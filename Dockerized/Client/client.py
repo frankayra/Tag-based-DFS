@@ -1,10 +1,10 @@
 
 import time
 import os
-import sys
+# import sys
+# sys.path.append('../')
 import asyncio
 from pathlib import Path
-sys.path.append('../')
 
 from flask import Flask, jsonify
 from flask_cors import CORS
@@ -13,12 +13,12 @@ import grpc
 from gRPC import communication_pb2 as communication_messages
 from gRPC import communication_pb2_grpc as communication
 
-from Client.parser import exec_command, RunPrompt
+from parser import exec_command, RunPrompt
 
 ######################### TERMINAL SERVER #########################
 
 async def actions(action: str, arg1_list, arg2_list):
-    with grpc.insecure_channel('localhost:50051') as channel:
+    with grpc.insecure_channel('ds-server:50051') as channel:
         stub = communication.ClientAPIStub(channel)
         match action:
             case 'add':
