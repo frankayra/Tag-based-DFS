@@ -13,8 +13,8 @@ RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
 # EXPOSE 3000
-EXPOSE 50051
+EXPOSE 8000
 
 
-# Levantar el server
-CMD ["python", "server.py"]
+# Comando para ejecutar la aplicación Python (modifica según tu proyecto)
+CMD ["python", "client.py"]

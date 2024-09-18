@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+// option python_package = "my_grpc_package";
+// option python_multiple_files = true;
+option java_multiple_files = true;
+option java_package = "io.grpc.examples.helloworld";
+option java_outer_classname = "HelloWorldProto";
+option objc_class_prefix = "HLW";
+
+package TagBasedFileSystem;
+
+service ClientAPI {
+    rpc list (TagList) returns (stream FileGeneralInfo);
+    rpc fileContent (FileLocation) returns (FileContent);
+    rpc addFiles (FilesToAdd) returns (OperationResult);
+    rpc addTags (TagQuery) returns (OperationResult);
+    rpc delete (TagList) returns (OperationResult);
+    rpc deleteTags (TagQuery) returns (OperationResult);
+}
+// service CRUD {
+
+// }
+// service Stabilization{
+    
+// }
+
+message TagList{
+    repeated string tags = 1;
+}
+
+message TagQuery{
+    repeated string tags_query = 1;
+    repeated string operation_tags = 2;
+}
+
+message FileContent{
+    string title = 1;
+    string content = 2;
+}
+message FilesToAdd{
+    repeated FileContent files = 1;
+    repeated string tags = 2;
+}
+message OperationResult{
+    bool success = 1;
+    string message = 2;
+}
+message FileLocation{
+    string file_hash = 1;
+    int32 location_hash = 2;
+}
+message FileGeneralInfo{
+    string title = 1;
+    FileLocation location = 2;
+    repeated string tag_list = 3;
+}
