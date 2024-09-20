@@ -1,9 +1,27 @@
 from google.protobuf.internal import containers as _containers
+from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
 from typing import ClassVar as _ClassVar, Iterable as _Iterable, Mapping as _Mapping, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
+
+class Operation(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    ADD_FILES: _ClassVar[Operation]
+    ADD_TAGS: _ClassVar[Operation]
+    DELETE: _ClassVar[Operation]
+    DELETE_TAGS: _ClassVar[Operation]
+    LIST: _ClassVar[Operation]
+    FILE_CONTENT: _ClassVar[Operation]
+    SUCCEEDOR: _ClassVar[Operation]
+ADD_FILES: Operation
+ADD_TAGS: Operation
+DELETE: Operation
+DELETE_TAGS: Operation
+LIST: Operation
+FILE_CONTENT: Operation
+SUCCEEDOR: Operation
 
 class TagList(_message.Message):
     __slots__ = ("tags",)
@@ -60,3 +78,177 @@ class FileGeneralInfo(_message.Message):
     location: FileLocation
     tag_list: _containers.RepeatedScalarFieldContainer[str]
     def __init__(self, title: _Optional[str] = ..., location: _Optional[_Union[FileLocation, _Mapping]] = ..., tag_list: _Optional[_Iterable[str]] = ...) -> None: ...
+
+class Empty(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class ServerID(_message.Message):
+    __slots__ = ("serverID",)
+    SERVERID_FIELD_NUMBER: _ClassVar[int]
+    serverID: int
+    def __init__(self, serverID: _Optional[int] = ...) -> None: ...
+
+class ChordNodeReference(_message.Message):
+    __slots__ = ("id", "ip", "port")
+    ID_FIELD_NUMBER: _ClassVar[int]
+    IP_FIELD_NUMBER: _ClassVar[int]
+    PORT_FIELD_NUMBER: _ClassVar[int]
+    id: int
+    ip: str
+    port: int
+    def __init__(self, id: _Optional[int] = ..., ip: _Optional[str] = ..., port: _Optional[int] = ...) -> None: ...
+
+class RingOperationRequest(_message.Message):
+    __slots__ = ("requesting_node", "searching_id", "requested_operation")
+    REQUESTING_NODE_FIELD_NUMBER: _ClassVar[int]
+    SEARCHING_ID_FIELD_NUMBER: _ClassVar[int]
+    REQUESTED_OPERATION_FIELD_NUMBER: _ClassVar[int]
+    requesting_node: ChordNodeReference
+    searching_id: int
+    requested_operation: Operation
+    def __init__(self, requesting_node: _Optional[_Union[ChordNodeReference, _Mapping]] = ..., searching_id: _Optional[int] = ..., requested_operation: _Optional[_Union[Operation, str]] = ...) -> None: ...
+
+class OperationType(_message.Message):
+    __slots__ = ("requested_operation",)
+    REQUESTED_OPERATION_FIELD_NUMBER: _ClassVar[int]
+    requested_operation: Operation
+    def __init__(self, requested_operation: _Optional[_Union[Operation, str]] = ...) -> None: ...
+
+class OperationReceived(_message.Message):
+    __slots__ = ("success",)
+    SUCCESS_FIELD_NUMBER: _ClassVar[int]
+    success: bool
+    def __init__(self, success: bool = ...) -> None: ...
+
+class FilesToAddWithLocation(_message.Message):
+    __slots__ = ("files", "tags", "location_hash")
+    FILES_FIELD_NUMBER: _ClassVar[int]
+    TAGS_FIELD_NUMBER: _ClassVar[int]
+    LOCATION_HASH_FIELD_NUMBER: _ClassVar[int]
+    files: _containers.RepeatedCompositeFieldContainer[FileContent]
+    tags: _containers.RepeatedScalarFieldContainer[str]
+    location_hash: int
+    def __init__(self, files: _Optional[_Iterable[_Union[FileContent, _Mapping]]] = ..., tags: _Optional[_Iterable[str]] = ..., location_hash: _Optional[int] = ...) -> None: ...
+
+class FileReference(_message.Message):
+    __slots__ = ("title", "file_hash")
+    TITLE_FIELD_NUMBER: _ClassVar[int]
+    FILE_HASH_FIELD_NUMBER: _ClassVar[int]
+    title: str
+    file_hash: int
+    def __init__(self, title: _Optional[str] = ..., file_hash: _Optional[int] = ...) -> None: ...
+
+class FilesReferencesToAdd(_message.Message):
+    __slots__ = ("location_hash", "files_references", "tags")
+    LOCATION_HASH_FIELD_NUMBER: _ClassVar[int]
+    FILES_REFERENCES_FIELD_NUMBER: _ClassVar[int]
+    TAGS_FIELD_NUMBER: _ClassVar[int]
+    location_hash: int
+    files_references: _containers.RepeatedCompositeFieldContainer[FileReference]
+    tags: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, location_hash: _Optional[int] = ..., files_references: _Optional[_Iterable[_Union[FileReference, _Mapping]]] = ..., tags: _Optional[_Iterable[str]] = ...) -> None: ...
+
+class FilesReferences(_message.Message):
+    __slots__ = ("files_references",)
+    FILES_REFERENCES_FIELD_NUMBER: _ClassVar[int]
+    files_references: _containers.RepeatedCompositeFieldContainer[FileReference]
+    def __init__(self, files_references: _Optional[_Iterable[_Union[FileReference, _Mapping]]] = ...) -> None: ...
+
+class UpdateRequestArguments(_message.Message):
+    __slots__ = ("files", "tag_list")
+    FILES_FIELD_NUMBER: _ClassVar[int]
+    TAG_LIST_FIELD_NUMBER: _ClassVar[int]
+    files: FilesReferences
+    tag_list: TagList
+    def __init__(self, files: _Optional[_Union[FilesReferences, _Mapping]] = ..., tag_list: _Optional[_Union[TagList, _Mapping]] = ...) -> None: ...
+
+class UpdateTagsRequest(_message.Message):
+    __slots__ = ("args", "operation_tags")
+    ARGS_FIELD_NUMBER: _ClassVar[int]
+    OPERATION_TAGS_FIELD_NUMBER: _ClassVar[int]
+    args: UpdateRequestArguments
+    operation_tags: TagList
+    def __init__(self, args: _Optional[_Union[UpdateRequestArguments, _Mapping]] = ..., operation_tags: _Optional[_Union[TagList, _Mapping]] = ...) -> None: ...
+
+class FilesToReplicate(_message.Message):
+    __slots__ = ("files", "location_hash", "main_replica_node_reference")
+    FILES_FIELD_NUMBER: _ClassVar[int]
+    LOCATION_HASH_FIELD_NUMBER: _ClassVar[int]
+    MAIN_REPLICA_NODE_REFERENCE_FIELD_NUMBER: _ClassVar[int]
+    files: FilesToAdd
+    location_hash: int
+    main_replica_node_reference: ChordNodeReference
+    def __init__(self, files: _Optional[_Union[FilesToAdd, _Mapping]] = ..., location_hash: _Optional[int] = ..., main_replica_node_reference: _Optional[_Union[ChordNodeReference, _Mapping]] = ...) -> None: ...
+
+class RawDatabases(_message.Message):
+    __slots__ = ("db_phisical", "db_references")
+    DB_PHISICAL_FIELD_NUMBER: _ClassVar[int]
+    DB_REFERENCES_FIELD_NUMBER: _ClassVar[int]
+    db_phisical: bytes
+    db_references: bytes
+    def __init__(self, db_phisical: _Optional[bytes] = ..., db_references: _Optional[bytes] = ...) -> None: ...
+
+class FilesToUpdateRquest(_message.Message):
+    __slots__ = ("args", "node_reference")
+    ARGS_FIELD_NUMBER: _ClassVar[int]
+    NODE_REFERENCE_FIELD_NUMBER: _ClassVar[int]
+    args: UpdateRequestArguments
+    node_reference: ChordNodeReference
+    def __init__(self, args: _Optional[_Union[UpdateRequestArguments, _Mapping]] = ..., node_reference: _Optional[_Union[ChordNodeReference, _Mapping]] = ...) -> None: ...
+
+class ChordNodeReferences(_message.Message):
+    __slots__ = ("references",)
+    REFERENCES_FIELD_NUMBER: _ClassVar[int]
+    references: _containers.RepeatedCompositeFieldContainer[ChordNodeReference]
+    def __init__(self, references: _Optional[_Iterable[_Union[ChordNodeReference, _Mapping]]] = ...) -> None: ...
+
+class LiveAnswer(_message.Message):
+    __slots__ = ("any_changes", "next_nodes_list")
+    ANY_CHANGES_FIELD_NUMBER: _ClassVar[int]
+    NEXT_NODES_LIST_FIELD_NUMBER: _ClassVar[int]
+    any_changes: bool
+    next_nodes_list: ChordNodeReferences
+    def __init__(self, any_changes: bool = ..., next_nodes_list: _Optional[_Union[ChordNodeReferences, _Mapping]] = ...) -> None: ...
+
+class NodeEntranceRequest(_message.Message):
+    __slots__ = ("new_node_reference", "claiming_id")
+    NEW_NODE_REFERENCE_FIELD_NUMBER: _ClassVar[int]
+    CLAIMING_ID_FIELD_NUMBER: _ClassVar[int]
+    new_node_reference: ChordNodeReference
+    claiming_id: int
+    def __init__(self, new_node_reference: _Optional[_Union[ChordNodeReference, _Mapping]] = ..., claiming_id: _Optional[int] = ...) -> None: ...
+
+class IAmYourNextRequest(_message.Message):
+    __slots__ = ("next_list", "prev")
+    NEXT_LIST_FIELD_NUMBER: _ClassVar[int]
+    PREV_FIELD_NUMBER: _ClassVar[int]
+    next_list: ChordNodeReferences
+    prev: ChordNodeReference
+    def __init__(self, next_list: _Optional[_Union[ChordNodeReferences, _Mapping]] = ..., prev: _Optional[_Union[ChordNodeReference, _Mapping]] = ...) -> None: ...
+
+class FileToTransfer(_message.Message):
+    __slots__ = ("file", "tags", "location")
+    FILE_FIELD_NUMBER: _ClassVar[int]
+    TAGS_FIELD_NUMBER: _ClassVar[int]
+    LOCATION_FIELD_NUMBER: _ClassVar[int]
+    file: FileContent
+    tags: _containers.RepeatedScalarFieldContainer[str]
+    location: FileLocation
+    def __init__(self, file: _Optional[_Union[FileContent, _Mapping]] = ..., tags: _Optional[_Iterable[str]] = ..., location: _Optional[_Union[FileLocation, _Mapping]] = ...) -> None: ...
+
+class FilesAllotmentTransferRequest(_message.Message):
+    __slots__ = ("files",)
+    FILES_FIELD_NUMBER: _ClassVar[int]
+    files: _containers.RepeatedCompositeFieldContainer[FileToTransfer]
+    def __init__(self, files: _Optional[_Iterable[_Union[FileToTransfer, _Mapping]]] = ...) -> None: ...
+
+class UpdateFingerTableRequest(_message.Message):
+    __slots__ = ("node_reference", "updates_so_far", "remaining_updates")
+    NODE_REFERENCE_FIELD_NUMBER: _ClassVar[int]
+    UPDATES_SO_FAR_FIELD_NUMBER: _ClassVar[int]
+    REMAINING_UPDATES_FIELD_NUMBER: _ClassVar[int]
+    node_reference: ChordNodeReference
+    updates_so_far: int
+    remaining_updates: int
+    def __init__(self, node_reference: _Optional[_Union[ChordNodeReference, _Mapping]] = ..., updates_so_far: _Optional[int] = ..., remaining_updates: _Optional[int] = ...) -> None: ...

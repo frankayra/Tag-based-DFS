@@ -310,3 +310,1199 @@ class ClientAPI(object):
             timeout,
             metadata,
             _registered_method=True)
+
+
+class ChordNetworkCommunicationStub(object):
+    """////////////////////////////////////////////////////////////// Chord 
+
+    """
+
+    def __init__(self, channel):
+        """Constructor.
+
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.succesor = channel.unary_unary(
+                '/TagBasedFileSystem.ChordNetworkCommunication/succesor',
+                request_serializer=communication__pb2.RingOperationRequest.SerializeToString,
+                response_deserializer=communication__pb2.OperationReceived.FromString,
+                _registered_method=True)
+        self.proceed_with_operation = channel.unary_unary(
+                '/TagBasedFileSystem.ChordNetworkCommunication/proceed_with_operation',
+                request_serializer=communication__pb2.OperationType.SerializeToString,
+                response_deserializer=communication__pb2.OperationReceived.FromString,
+                _registered_method=True)
+        self.list = channel.unary_stream(
+                '/TagBasedFileSystem.ChordNetworkCommunication/list',
+                request_serializer=communication__pb2.TagList.SerializeToString,
+                response_deserializer=communication__pb2.FileGeneralInfo.FromString,
+                _registered_method=True)
+        self.file_content = channel.unary_unary(
+                '/TagBasedFileSystem.ChordNetworkCommunication/file_content',
+                request_serializer=communication__pb2.FileLocation.SerializeToString,
+                response_deserializer=communication__pb2.FileContent.FromString,
+                _registered_method=True)
+        self.add_files = channel.unary_unary(
+                '/TagBasedFileSystem.ChordNetworkCommunication/add_files',
+                request_serializer=communication__pb2.FilesToAddWithLocation.SerializeToString,
+                response_deserializer=communication__pb2.OperationResult.FromString,
+                _registered_method=True)
+        self.add_tags = channel.unary_unary(
+                '/TagBasedFileSystem.ChordNetworkCommunication/add_tags',
+                request_serializer=communication__pb2.TagQuery.SerializeToString,
+                response_deserializer=communication__pb2.OperationResult.FromString,
+                _registered_method=True)
+        self.delete = channel.unary_unary(
+                '/TagBasedFileSystem.ChordNetworkCommunication/delete',
+                request_serializer=communication__pb2.TagList.SerializeToString,
+                response_deserializer=communication__pb2.OperationResult.FromString,
+                _registered_method=True)
+        self.delete_tags = channel.unary_unary(
+                '/TagBasedFileSystem.ChordNetworkCommunication/delete_tags',
+                request_serializer=communication__pb2.TagQuery.SerializeToString,
+                response_deserializer=communication__pb2.OperationResult.FromString,
+                _registered_method=True)
+        self.replicate = channel.unary_unary(
+                '/TagBasedFileSystem.ChordNetworkCommunication/replicate',
+                request_serializer=communication__pb2.FilesToReplicate.SerializeToString,
+                response_deserializer=communication__pb2.OperationResult.FromString,
+                _registered_method=True)
+        self.send_raw_database_replica = channel.unary_unary(
+                '/TagBasedFileSystem.ChordNetworkCommunication/send_raw_database_replica',
+                request_serializer=communication__pb2.RawDatabases.SerializeToString,
+                response_deserializer=communication__pb2.OperationResult.FromString,
+                _registered_method=True)
+        self.add_references = channel.unary_unary(
+                '/TagBasedFileSystem.ChordNetworkCommunication/add_references',
+                request_serializer=communication__pb2.FilesReferencesToAdd.SerializeToString,
+                response_deserializer=communication__pb2.OperationResult.FromString,
+                _registered_method=True)
+        self.delete_files_replicas = channel.unary_unary(
+                '/TagBasedFileSystem.ChordNetworkCommunication/delete_files_replicas',
+                request_serializer=communication__pb2.FilesToUpdateRquest.SerializeToString,
+                response_deserializer=communication__pb2.OperationResult.FromString,
+                _registered_method=True)
+        self.delete_files_references = channel.unary_unary(
+                '/TagBasedFileSystem.ChordNetworkCommunication/delete_files_references',
+                request_serializer=communication__pb2.FilesToUpdateRquest.SerializeToString,
+                response_deserializer=communication__pb2.OperationResult.FromString,
+                _registered_method=True)
+        self.add_tags_to_refered_files = channel.unary_unary(
+                '/TagBasedFileSystem.ChordNetworkCommunication/add_tags_to_refered_files',
+                request_serializer=communication__pb2.UpdateTagsRequest.SerializeToString,
+                response_deserializer=communication__pb2.OperationResult.FromString,
+                _registered_method=True)
+        self.add_tags_to_replicated_files = channel.unary_unary(
+                '/TagBasedFileSystem.ChordNetworkCommunication/add_tags_to_replicated_files',
+                request_serializer=communication__pb2.UpdateTagsRequest.SerializeToString,
+                response_deserializer=communication__pb2.OperationResult.FromString,
+                _registered_method=True)
+        self.delete_tags_from_refered_files = channel.unary_unary(
+                '/TagBasedFileSystem.ChordNetworkCommunication/delete_tags_from_refered_files',
+                request_serializer=communication__pb2.UpdateTagsRequest.SerializeToString,
+                response_deserializer=communication__pb2.OperationResult.FromString,
+                _registered_method=True)
+        self.delete_tags_from_replicated_files = channel.unary_unary(
+                '/TagBasedFileSystem.ChordNetworkCommunication/delete_tags_from_replicated_files',
+                request_serializer=communication__pb2.UpdateTagsRequest.SerializeToString,
+                response_deserializer=communication__pb2.OperationResult.FromString,
+                _registered_method=True)
+        self.heartbeat = channel.unary_unary(
+                '/TagBasedFileSystem.ChordNetworkCommunication/heartbeat',
+                request_serializer=communication__pb2.Empty.SerializeToString,
+                response_deserializer=communication__pb2.Empty.FromString,
+                _registered_method=True)
+        self.alive_request = channel.unary_unary(
+                '/TagBasedFileSystem.ChordNetworkCommunication/alive_request',
+                request_serializer=communication__pb2.Empty.SerializeToString,
+                response_deserializer=communication__pb2.LiveAnswer.FromString,
+                _registered_method=True)
+        self.unreplicate = channel.unary_unary(
+                '/TagBasedFileSystem.ChordNetworkCommunication/unreplicate',
+                request_serializer=communication__pb2.ChordNodeReference.SerializeToString,
+                response_deserializer=communication__pb2.OperationResult.FromString,
+                _registered_method=True)
+        self.node_entrance_request = channel.unary_unary(
+                '/TagBasedFileSystem.ChordNetworkCommunication/node_entrance_request',
+                request_serializer=communication__pb2.NodeEntranceRequest.SerializeToString,
+                response_deserializer=communication__pb2.OperationResult.FromString,
+                _registered_method=True)
+        self.i_am_your_next = channel.unary_unary(
+                '/TagBasedFileSystem.ChordNetworkCommunication/i_am_your_next',
+                request_serializer=communication__pb2.IAmYourNextRequest.SerializeToString,
+                response_deserializer=communication__pb2.OperationReceived.FromString,
+                _registered_method=True)
+        self.update_next = channel.unary_unary(
+                '/TagBasedFileSystem.ChordNetworkCommunication/update_next',
+                request_serializer=communication__pb2.ChordNodeReference.SerializeToString,
+                response_deserializer=communication__pb2.OperationReceived.FromString,
+                _registered_method=True)
+        self.files_allotment_transfer = channel.unary_unary(
+                '/TagBasedFileSystem.ChordNetworkCommunication/files_allotment_transfer',
+                request_serializer=communication__pb2.FilesAllotmentTransferRequest.SerializeToString,
+                response_deserializer=communication__pb2.OperationResult.FromString,
+                _registered_method=True)
+        self.update_replication_clique = channel.unary_unary(
+                '/TagBasedFileSystem.ChordNetworkCommunication/update_replication_clique',
+                request_serializer=communication__pb2.ChordNodeReferences.SerializeToString,
+                response_deserializer=communication__pb2.OperationResult.FromString,
+                _registered_method=True)
+        self.i_am_your_prev = channel.unary_unary(
+                '/TagBasedFileSystem.ChordNetworkCommunication/i_am_your_prev',
+                request_serializer=communication__pb2.ChordNodeReference.SerializeToString,
+                response_deserializer=communication__pb2.OperationResult.FromString,
+                _registered_method=True)
+        self.update_finger_table = channel.unary_unary(
+                '/TagBasedFileSystem.ChordNetworkCommunication/update_finger_table',
+                request_serializer=communication__pb2.UpdateFingerTableRequest.SerializeToString,
+                response_deserializer=communication__pb2.OperationReceived.FromString,
+                _registered_method=True)
+
+
+class ChordNetworkCommunicationServicer(object):
+    """////////////////////////////////////////////////////////////// Chord 
+
+    """
+
+    def succesor(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def proceed_with_operation(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def list(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def file_content(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def add_files(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def add_tags(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def delete(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def delete_tags(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def replicate(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def send_raw_database_replica(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def add_references(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def delete_files_replicas(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def delete_files_references(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def add_tags_to_refered_files(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def add_tags_to_replicated_files(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def delete_tags_from_refered_files(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def delete_tags_from_replicated_files(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def heartbeat(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def alive_request(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def unreplicate(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def node_entrance_request(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def i_am_your_next(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def update_next(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def files_allotment_transfer(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def update_replication_clique(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def i_am_your_prev(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def update_finger_table(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+
+def add_ChordNetworkCommunicationServicer_to_server(servicer, server):
+    rpc_method_handlers = {
+            'succesor': grpc.unary_unary_rpc_method_handler(
+                    servicer.succesor,
+                    request_deserializer=communication__pb2.RingOperationRequest.FromString,
+                    response_serializer=communication__pb2.OperationReceived.SerializeToString,
+            ),
+            'proceed_with_operation': grpc.unary_unary_rpc_method_handler(
+                    servicer.proceed_with_operation,
+                    request_deserializer=communication__pb2.OperationType.FromString,
+                    response_serializer=communication__pb2.OperationReceived.SerializeToString,
+            ),
+            'list': grpc.unary_stream_rpc_method_handler(
+                    servicer.list,
+                    request_deserializer=communication__pb2.TagList.FromString,
+                    response_serializer=communication__pb2.FileGeneralInfo.SerializeToString,
+            ),
+            'file_content': grpc.unary_unary_rpc_method_handler(
+                    servicer.file_content,
+                    request_deserializer=communication__pb2.FileLocation.FromString,
+                    response_serializer=communication__pb2.FileContent.SerializeToString,
+            ),
+            'add_files': grpc.unary_unary_rpc_method_handler(
+                    servicer.add_files,
+                    request_deserializer=communication__pb2.FilesToAddWithLocation.FromString,
+                    response_serializer=communication__pb2.OperationResult.SerializeToString,
+            ),
+            'add_tags': grpc.unary_unary_rpc_method_handler(
+                    servicer.add_tags,
+                    request_deserializer=communication__pb2.TagQuery.FromString,
+                    response_serializer=communication__pb2.OperationResult.SerializeToString,
+            ),
+            'delete': grpc.unary_unary_rpc_method_handler(
+                    servicer.delete,
+                    request_deserializer=communication__pb2.TagList.FromString,
+                    response_serializer=communication__pb2.OperationResult.SerializeToString,
+            ),
+            'delete_tags': grpc.unary_unary_rpc_method_handler(
+                    servicer.delete_tags,
+                    request_deserializer=communication__pb2.TagQuery.FromString,
+                    response_serializer=communication__pb2.OperationResult.SerializeToString,
+            ),
+            'replicate': grpc.unary_unary_rpc_method_handler(
+                    servicer.replicate,
+                    request_deserializer=communication__pb2.FilesToReplicate.FromString,
+                    response_serializer=communication__pb2.OperationResult.SerializeToString,
+            ),
+            'send_raw_database_replica': grpc.unary_unary_rpc_method_handler(
+                    servicer.send_raw_database_replica,
+                    request_deserializer=communication__pb2.RawDatabases.FromString,
+                    response_serializer=communication__pb2.OperationResult.SerializeToString,
+            ),
+            'add_references': grpc.unary_unary_rpc_method_handler(
+                    servicer.add_references,
+                    request_deserializer=communication__pb2.FilesReferencesToAdd.FromString,
+                    response_serializer=communication__pb2.OperationResult.SerializeToString,
+            ),
+            'delete_files_replicas': grpc.unary_unary_rpc_method_handler(
+                    servicer.delete_files_replicas,
+                    request_deserializer=communication__pb2.FilesToUpdateRquest.FromString,
+                    response_serializer=communication__pb2.OperationResult.SerializeToString,
+            ),
+            'delete_files_references': grpc.unary_unary_rpc_method_handler(
+                    servicer.delete_files_references,
+                    request_deserializer=communication__pb2.FilesToUpdateRquest.FromString,
+                    response_serializer=communication__pb2.OperationResult.SerializeToString,
+            ),
+            'add_tags_to_refered_files': grpc.unary_unary_rpc_method_handler(
+                    servicer.add_tags_to_refered_files,
+                    request_deserializer=communication__pb2.UpdateTagsRequest.FromString,
+                    response_serializer=communication__pb2.OperationResult.SerializeToString,
+            ),
+            'add_tags_to_replicated_files': grpc.unary_unary_rpc_method_handler(
+                    servicer.add_tags_to_replicated_files,
+                    request_deserializer=communication__pb2.UpdateTagsRequest.FromString,
+                    response_serializer=communication__pb2.OperationResult.SerializeToString,
+            ),
+            'delete_tags_from_refered_files': grpc.unary_unary_rpc_method_handler(
+                    servicer.delete_tags_from_refered_files,
+                    request_deserializer=communication__pb2.UpdateTagsRequest.FromString,
+                    response_serializer=communication__pb2.OperationResult.SerializeToString,
+            ),
+            'delete_tags_from_replicated_files': grpc.unary_unary_rpc_method_handler(
+                    servicer.delete_tags_from_replicated_files,
+                    request_deserializer=communication__pb2.UpdateTagsRequest.FromString,
+                    response_serializer=communication__pb2.OperationResult.SerializeToString,
+            ),
+            'heartbeat': grpc.unary_unary_rpc_method_handler(
+                    servicer.heartbeat,
+                    request_deserializer=communication__pb2.Empty.FromString,
+                    response_serializer=communication__pb2.Empty.SerializeToString,
+            ),
+            'alive_request': grpc.unary_unary_rpc_method_handler(
+                    servicer.alive_request,
+                    request_deserializer=communication__pb2.Empty.FromString,
+                    response_serializer=communication__pb2.LiveAnswer.SerializeToString,
+            ),
+            'unreplicate': grpc.unary_unary_rpc_method_handler(
+                    servicer.unreplicate,
+                    request_deserializer=communication__pb2.ChordNodeReference.FromString,
+                    response_serializer=communication__pb2.OperationResult.SerializeToString,
+            ),
+            'node_entrance_request': grpc.unary_unary_rpc_method_handler(
+                    servicer.node_entrance_request,
+                    request_deserializer=communication__pb2.NodeEntranceRequest.FromString,
+                    response_serializer=communication__pb2.OperationResult.SerializeToString,
+            ),
+            'i_am_your_next': grpc.unary_unary_rpc_method_handler(
+                    servicer.i_am_your_next,
+                    request_deserializer=communication__pb2.IAmYourNextRequest.FromString,
+                    response_serializer=communication__pb2.OperationReceived.SerializeToString,
+            ),
+            'update_next': grpc.unary_unary_rpc_method_handler(
+                    servicer.update_next,
+                    request_deserializer=communication__pb2.ChordNodeReference.FromString,
+                    response_serializer=communication__pb2.OperationReceived.SerializeToString,
+            ),
+            'files_allotment_transfer': grpc.unary_unary_rpc_method_handler(
+                    servicer.files_allotment_transfer,
+                    request_deserializer=communication__pb2.FilesAllotmentTransferRequest.FromString,
+                    response_serializer=communication__pb2.OperationResult.SerializeToString,
+            ),
+            'update_replication_clique': grpc.unary_unary_rpc_method_handler(
+                    servicer.update_replication_clique,
+                    request_deserializer=communication__pb2.ChordNodeReferences.FromString,
+                    response_serializer=communication__pb2.OperationResult.SerializeToString,
+            ),
+            'i_am_your_prev': grpc.unary_unary_rpc_method_handler(
+                    servicer.i_am_your_prev,
+                    request_deserializer=communication__pb2.ChordNodeReference.FromString,
+                    response_serializer=communication__pb2.OperationResult.SerializeToString,
+            ),
+            'update_finger_table': grpc.unary_unary_rpc_method_handler(
+                    servicer.update_finger_table,
+                    request_deserializer=communication__pb2.UpdateFingerTableRequest.FromString,
+                    response_serializer=communication__pb2.OperationReceived.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'TagBasedFileSystem.ChordNetworkCommunication', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+    server.add_registered_method_handlers('TagBasedFileSystem.ChordNetworkCommunication', rpc_method_handlers)
+
+
+ # This class is part of an EXPERIMENTAL API.
+class ChordNetworkCommunication(object):
+    """////////////////////////////////////////////////////////////// Chord 
+
+    """
+
+    @staticmethod
+    def succesor(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/TagBasedFileSystem.ChordNetworkCommunication/succesor',
+            communication__pb2.RingOperationRequest.SerializeToString,
+            communication__pb2.OperationReceived.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def proceed_with_operation(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/TagBasedFileSystem.ChordNetworkCommunication/proceed_with_operation',
+            communication__pb2.OperationType.SerializeToString,
+            communication__pb2.OperationReceived.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def list(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(
+            request,
+            target,
+            '/TagBasedFileSystem.ChordNetworkCommunication/list',
+            communication__pb2.TagList.SerializeToString,
+            communication__pb2.FileGeneralInfo.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def file_content(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/TagBasedFileSystem.ChordNetworkCommunication/file_content',
+            communication__pb2.FileLocation.SerializeToString,
+            communication__pb2.FileContent.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def add_files(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/TagBasedFileSystem.ChordNetworkCommunication/add_files',
+            communication__pb2.FilesToAddWithLocation.SerializeToString,
+            communication__pb2.OperationResult.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def add_tags(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/TagBasedFileSystem.ChordNetworkCommunication/add_tags',
+            communication__pb2.TagQuery.SerializeToString,
+            communication__pb2.OperationResult.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def delete(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/TagBasedFileSystem.ChordNetworkCommunication/delete',
+            communication__pb2.TagList.SerializeToString,
+            communication__pb2.OperationResult.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def delete_tags(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/TagBasedFileSystem.ChordNetworkCommunication/delete_tags',
+            communication__pb2.TagQuery.SerializeToString,
+            communication__pb2.OperationResult.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def replicate(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/TagBasedFileSystem.ChordNetworkCommunication/replicate',
+            communication__pb2.FilesToReplicate.SerializeToString,
+            communication__pb2.OperationResult.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def send_raw_database_replica(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/TagBasedFileSystem.ChordNetworkCommunication/send_raw_database_replica',
+            communication__pb2.RawDatabases.SerializeToString,
+            communication__pb2.OperationResult.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def add_references(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/TagBasedFileSystem.ChordNetworkCommunication/add_references',
+            communication__pb2.FilesReferencesToAdd.SerializeToString,
+            communication__pb2.OperationResult.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def delete_files_replicas(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/TagBasedFileSystem.ChordNetworkCommunication/delete_files_replicas',
+            communication__pb2.FilesToUpdateRquest.SerializeToString,
+            communication__pb2.OperationResult.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def delete_files_references(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/TagBasedFileSystem.ChordNetworkCommunication/delete_files_references',
+            communication__pb2.FilesToUpdateRquest.SerializeToString,
+            communication__pb2.OperationResult.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def add_tags_to_refered_files(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/TagBasedFileSystem.ChordNetworkCommunication/add_tags_to_refered_files',
+            communication__pb2.UpdateTagsRequest.SerializeToString,
+            communication__pb2.OperationResult.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def add_tags_to_replicated_files(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/TagBasedFileSystem.ChordNetworkCommunication/add_tags_to_replicated_files',
+            communication__pb2.UpdateTagsRequest.SerializeToString,
+            communication__pb2.OperationResult.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def delete_tags_from_refered_files(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/TagBasedFileSystem.ChordNetworkCommunication/delete_tags_from_refered_files',
+            communication__pb2.UpdateTagsRequest.SerializeToString,
+            communication__pb2.OperationResult.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def delete_tags_from_replicated_files(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/TagBasedFileSystem.ChordNetworkCommunication/delete_tags_from_replicated_files',
+            communication__pb2.UpdateTagsRequest.SerializeToString,
+            communication__pb2.OperationResult.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def heartbeat(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/TagBasedFileSystem.ChordNetworkCommunication/heartbeat',
+            communication__pb2.Empty.SerializeToString,
+            communication__pb2.Empty.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def alive_request(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/TagBasedFileSystem.ChordNetworkCommunication/alive_request',
+            communication__pb2.Empty.SerializeToString,
+            communication__pb2.LiveAnswer.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def unreplicate(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/TagBasedFileSystem.ChordNetworkCommunication/unreplicate',
+            communication__pb2.ChordNodeReference.SerializeToString,
+            communication__pb2.OperationResult.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def node_entrance_request(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/TagBasedFileSystem.ChordNetworkCommunication/node_entrance_request',
+            communication__pb2.NodeEntranceRequest.SerializeToString,
+            communication__pb2.OperationResult.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def i_am_your_next(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/TagBasedFileSystem.ChordNetworkCommunication/i_am_your_next',
+            communication__pb2.IAmYourNextRequest.SerializeToString,
+            communication__pb2.OperationReceived.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def update_next(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/TagBasedFileSystem.ChordNetworkCommunication/update_next',
+            communication__pb2.ChordNodeReference.SerializeToString,
+            communication__pb2.OperationReceived.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def files_allotment_transfer(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/TagBasedFileSystem.ChordNetworkCommunication/files_allotment_transfer',
+            communication__pb2.FilesAllotmentTransferRequest.SerializeToString,
+            communication__pb2.OperationResult.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def update_replication_clique(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/TagBasedFileSystem.ChordNetworkCommunication/update_replication_clique',
+            communication__pb2.ChordNodeReferences.SerializeToString,
+            communication__pb2.OperationResult.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def i_am_your_prev(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/TagBasedFileSystem.ChordNetworkCommunication/i_am_your_prev',
+            communication__pb2.ChordNodeReference.SerializeToString,
+            communication__pb2.OperationResult.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def update_finger_table(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/TagBasedFileSystem.ChordNetworkCommunication/update_finger_table',
+            communication__pb2.UpdateFingerTableRequest.SerializeToString,
+            communication__pb2.OperationReceived.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
