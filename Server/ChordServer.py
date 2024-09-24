@@ -55,9 +55,11 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
            print("Se solicito una operacion que no estaba pendiente")
            self.ready_operations[operation_id] = Exception(f"Error al realizar la operacion {str(operation).casefold()}, dicha operacion que no estaba pendiente")
            return 
-        # NOTE Aqui no hay que esperar nada porque estamos ya esperando por el hilo
-        # para meter el resltado en la bandeja de salida y asi ClientAPIServer lo toma y 
-        # se lo envia al cliente.
+        # NOTE Aqui no hay que esperar nada porque ya el hilo principal espera por la respuesta
+        # final del servidor.
+        # Al recibir la respuesta se sigue el proceso no como cualquier otro metodo iterativo
+        # no concurrente ni paralelo para meter el resltado en la bandeja de salida y asi ClientAPIServer 
+        # lo toma y se lo envia al cliente.
         results = self.chord_client.RetakePendingOperation(node_reference, operation, info)
         # if operation == communication_messages.LIST:
         #     self.ready_operations[operation_id] = [item for item in results]
@@ -171,11 +173,9 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         if not recovered_file: return communication_messages.FileContent(title=None, content=None)
         return communication_messages.FileContent(title=recovered_file.name, content=recovered_file.content)
     def add_files(self, request, context): 
-        """FilesToAdd {files: FileContent[] {title: string, content: string}, tags: string[]}    =>    OperationResult {success: bool, message: string}"""
-        selected_tag = random.choice(request.tags)
-        files_location_hash = int(sha1(selected_tag.encode('utf-8')).hexdigest(), 16) % self.nodes_count
+        """FilesToAddWithLocation {files: FileContent[] {title: string, content: string}, tags: string[], location_hash: int}    =>    OperationResult {success: bool, message: string}"""
         try:
-            add_files_message = self.db_physical_files.AddFiles([(file.title, file.content) for file in request.files], [tag for tag in request.tags], files_location_hash)
+            add_files_message = self.db_physical_files.AddFiles([(file.title, file.content) for file in request.files], [tag for tag in request.tags], location_hash)
             return communication_messages.OperationResult(success=True, message=f"Archivos añadidos satisfactoriamente: {add_files_message}")
         except Exception as e:
             return communication_messages.OperationResult(success=False, message=f"Error al añadir los archivos solicitados: {e}")
