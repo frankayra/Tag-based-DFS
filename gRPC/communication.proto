@@ -51,7 +51,7 @@ message FileGeneralInfo{
 
 service ChordNetworkCommunication{
     rpc succesor (RingOperationRequest) returns (OperationReceived);
-    rpc proceed_with_operation (OperationType) returns (OperationReceived);
+    rpc proceed_with_operation (OperationDescription) returns (OperationReceived);
 
     rpc list (TagList) returns (stream FileGeneralInfo);
     rpc file_content (FileLocation) returns (FileContent);
@@ -86,7 +86,7 @@ service ChordNetworkCommunication{
     rpc i_am_your_prev (ChordNodeReference) returns (OperationResult);
 
     rpc update_finger_table (UpdateFingerTableRequest) returns (OperationReceived);
-    
+    rpc update_finger_table_forward (UpdateFingerTableRequest) returns (OperationReceived);
     // rpc replication_received (ChordNodeReference) returns (OperationReceived);
 }
 message Empty {}
@@ -98,7 +98,16 @@ enum Operation {
     DELETE_TAGS = 3;
     LIST = 4;
     FILE_CONTENT = 5;
-    SUCCEEDOR = 6;
+    SEND_RAW_DATABASE_REPLICA = 6;
+    ADD_REFERENCES = 7;
+    DELETE_FILES_REPLICAS = 8;
+    DELETE_FILES_REFERENCES = 9;
+    ADD_TAGS_TO_REFERED_FILES = 10;
+    ADD_TAGS_TO_REPLICATED_FILES = 11;
+    DELETE_TAGS_FROM_REFERED_FILES = 12;
+    DELETE_TAGS_FROM_REPLICATED_FILES = 13;
+    NODE_ENTRANCE_REQUEST = 14;
+    UPDATE_FINGER_TABLE = 15;
 }
 message ServerID {
     int32 serverID = 1;
@@ -112,9 +121,13 @@ message RingOperationRequest{
     ChordNodeReference requesting_node = 1;
     int32 searching_id = 2;
     Operation requested_operation = 3;
+    int32 operation_id = 4;
 }
-message OperationType {
+message OperationDescription {
     Operation requested_operation = 1;
+    ChordNodeReference node_reference = 2;
+    int32 id_founded = 3;
+    int32 operation_id = 4;
 }
 
 

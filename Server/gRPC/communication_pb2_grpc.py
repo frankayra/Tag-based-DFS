@@ -330,7 +330,7 @@ class ChordNetworkCommunicationStub(object):
                 _registered_method=True)
         self.proceed_with_operation = channel.unary_unary(
                 '/TagBasedFileSystem.ChordNetworkCommunication/proceed_with_operation',
-                request_serializer=communication__pb2.OperationType.SerializeToString,
+                request_serializer=communication__pb2.OperationDescription.SerializeToString,
                 response_deserializer=communication__pb2.OperationReceived.FromString,
                 _registered_method=True)
         self.list = channel.unary_stream(
@@ -455,6 +455,11 @@ class ChordNetworkCommunicationStub(object):
                 _registered_method=True)
         self.update_finger_table = channel.unary_unary(
                 '/TagBasedFileSystem.ChordNetworkCommunication/update_finger_table',
+                request_serializer=communication__pb2.UpdateFingerTableRequest.SerializeToString,
+                response_deserializer=communication__pb2.OperationReceived.FromString,
+                _registered_method=True)
+        self.update_finger_table_forward = channel.unary_unary(
+                '/TagBasedFileSystem.ChordNetworkCommunication/update_finger_table_forward',
                 request_serializer=communication__pb2.UpdateFingerTableRequest.SerializeToString,
                 response_deserializer=communication__pb2.OperationReceived.FromString,
                 _registered_method=True)
@@ -627,6 +632,13 @@ class ChordNetworkCommunicationServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def update_finger_table_forward(self, request, context):
+        """rpc replication_received (ChordNodeReference) returns (OperationReceived);
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_ChordNetworkCommunicationServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -637,7 +649,7 @@ def add_ChordNetworkCommunicationServicer_to_server(servicer, server):
             ),
             'proceed_with_operation': grpc.unary_unary_rpc_method_handler(
                     servicer.proceed_with_operation,
-                    request_deserializer=communication__pb2.OperationType.FromString,
+                    request_deserializer=communication__pb2.OperationDescription.FromString,
                     response_serializer=communication__pb2.OperationReceived.SerializeToString,
             ),
             'list': grpc.unary_stream_rpc_method_handler(
@@ -765,6 +777,11 @@ def add_ChordNetworkCommunicationServicer_to_server(servicer, server):
                     request_deserializer=communication__pb2.UpdateFingerTableRequest.FromString,
                     response_serializer=communication__pb2.OperationReceived.SerializeToString,
             ),
+            'update_finger_table_forward': grpc.unary_unary_rpc_method_handler(
+                    servicer.update_finger_table_forward,
+                    request_deserializer=communication__pb2.UpdateFingerTableRequest.FromString,
+                    response_serializer=communication__pb2.OperationReceived.SerializeToString,
+            ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
             'TagBasedFileSystem.ChordNetworkCommunication', rpc_method_handlers)
@@ -820,7 +837,7 @@ class ChordNetworkCommunication(object):
             request,
             target,
             '/TagBasedFileSystem.ChordNetworkCommunication/proceed_with_operation',
-            communication__pb2.OperationType.SerializeToString,
+            communication__pb2.OperationDescription.SerializeToString,
             communication__pb2.OperationReceived.FromString,
             options,
             channel_credentials,
@@ -1495,6 +1512,33 @@ class ChordNetworkCommunication(object):
             request,
             target,
             '/TagBasedFileSystem.ChordNetworkCommunication/update_finger_table',
+            communication__pb2.UpdateFingerTableRequest.SerializeToString,
+            communication__pb2.OperationReceived.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def update_finger_table_forward(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/TagBasedFileSystem.ChordNetworkCommunication/update_finger_table_forward',
             communication__pb2.UpdateFingerTableRequest.SerializeToString,
             communication__pb2.OperationReceived.FromString,
             options,

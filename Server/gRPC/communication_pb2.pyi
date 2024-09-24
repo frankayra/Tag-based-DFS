@@ -14,14 +14,32 @@ class Operation(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     DELETE_TAGS: _ClassVar[Operation]
     LIST: _ClassVar[Operation]
     FILE_CONTENT: _ClassVar[Operation]
-    SUCCEEDOR: _ClassVar[Operation]
+    SEND_RAW_DATABASE_REPLICA: _ClassVar[Operation]
+    ADD_REFERENCES: _ClassVar[Operation]
+    DELETE_FILES_REPLICAS: _ClassVar[Operation]
+    DELETE_FILES_REFERENCES: _ClassVar[Operation]
+    ADD_TAGS_TO_REFERED_FILES: _ClassVar[Operation]
+    ADD_TAGS_TO_REPLICATED_FILES: _ClassVar[Operation]
+    DELETE_TAGS_FROM_REFERED_FILES: _ClassVar[Operation]
+    DELETE_TAGS_FROM_REPLICATED_FILES: _ClassVar[Operation]
+    NODE_ENTRANCE_REQUEST: _ClassVar[Operation]
+    UPDATE_FINGER_TABLE: _ClassVar[Operation]
 ADD_FILES: Operation
 ADD_TAGS: Operation
 DELETE: Operation
 DELETE_TAGS: Operation
 LIST: Operation
 FILE_CONTENT: Operation
-SUCCEEDOR: Operation
+SEND_RAW_DATABASE_REPLICA: Operation
+ADD_REFERENCES: Operation
+DELETE_FILES_REPLICAS: Operation
+DELETE_FILES_REFERENCES: Operation
+ADD_TAGS_TO_REFERED_FILES: Operation
+ADD_TAGS_TO_REPLICATED_FILES: Operation
+DELETE_TAGS_FROM_REFERED_FILES: Operation
+DELETE_TAGS_FROM_REPLICATED_FILES: Operation
+NODE_ENTRANCE_REQUEST: Operation
+UPDATE_FINGER_TABLE: Operation
 
 class TagList(_message.Message):
     __slots__ = ("tags",)
@@ -100,20 +118,28 @@ class ChordNodeReference(_message.Message):
     def __init__(self, id: _Optional[int] = ..., ip: _Optional[str] = ..., port: _Optional[int] = ...) -> None: ...
 
 class RingOperationRequest(_message.Message):
-    __slots__ = ("requesting_node", "searching_id", "requested_operation")
+    __slots__ = ("requesting_node", "searching_id", "requested_operation", "operation_id")
     REQUESTING_NODE_FIELD_NUMBER: _ClassVar[int]
     SEARCHING_ID_FIELD_NUMBER: _ClassVar[int]
     REQUESTED_OPERATION_FIELD_NUMBER: _ClassVar[int]
+    OPERATION_ID_FIELD_NUMBER: _ClassVar[int]
     requesting_node: ChordNodeReference
     searching_id: int
     requested_operation: Operation
-    def __init__(self, requesting_node: _Optional[_Union[ChordNodeReference, _Mapping]] = ..., searching_id: _Optional[int] = ..., requested_operation: _Optional[_Union[Operation, str]] = ...) -> None: ...
+    operation_id: int
+    def __init__(self, requesting_node: _Optional[_Union[ChordNodeReference, _Mapping]] = ..., searching_id: _Optional[int] = ..., requested_operation: _Optional[_Union[Operation, str]] = ..., operation_id: _Optional[int] = ...) -> None: ...
 
-class OperationType(_message.Message):
-    __slots__ = ("requested_operation",)
+class OperationDescription(_message.Message):
+    __slots__ = ("requested_operation", "node_reference", "id_founded", "operation_id")
     REQUESTED_OPERATION_FIELD_NUMBER: _ClassVar[int]
+    NODE_REFERENCE_FIELD_NUMBER: _ClassVar[int]
+    ID_FOUNDED_FIELD_NUMBER: _ClassVar[int]
+    OPERATION_ID_FIELD_NUMBER: _ClassVar[int]
     requested_operation: Operation
-    def __init__(self, requested_operation: _Optional[_Union[Operation, str]] = ...) -> None: ...
+    node_reference: ChordNodeReference
+    id_founded: int
+    operation_id: int
+    def __init__(self, requested_operation: _Optional[_Union[Operation, str]] = ..., node_reference: _Optional[_Union[ChordNodeReference, _Mapping]] = ..., id_founded: _Optional[int] = ..., operation_id: _Optional[int] = ...) -> None: ...
 
 class OperationReceived(_message.Message):
     __slots__ = ("success",)
