@@ -24,6 +24,7 @@ class Operation(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     DELETE_TAGS_FROM_REPLICATED_FILES: _ClassVar[Operation]
     NODE_ENTRANCE_REQUEST: _ClassVar[Operation]
     UPDATE_FINGER_TABLE: _ClassVar[Operation]
+    UPDATE_FINGER_TABLE_FORWARD: _ClassVar[Operation]
 ADD_FILES: Operation
 ADD_TAGS: Operation
 DELETE: Operation
@@ -40,6 +41,7 @@ DELETE_TAGS_FROM_REFERED_FILES: Operation
 DELETE_TAGS_FROM_REPLICATED_FILES: Operation
 NODE_ENTRANCE_REQUEST: Operation
 UPDATE_FINGER_TABLE: Operation
+UPDATE_FINGER_TABLE_FORWARD: Operation
 
 class TagList(_message.Message):
     __slots__ = ("tags",)
@@ -246,12 +248,14 @@ class NodeEntranceRequest(_message.Message):
     def __init__(self, new_node_reference: _Optional[_Union[ChordNodeReference, _Mapping]] = ..., claiming_id: _Optional[int] = ...) -> None: ...
 
 class IAmYourNextRequest(_message.Message):
-    __slots__ = ("next_list", "prev")
+    __slots__ = ("next_list", "prev", "assigned_id")
     NEXT_LIST_FIELD_NUMBER: _ClassVar[int]
     PREV_FIELD_NUMBER: _ClassVar[int]
+    ASSIGNED_ID_FIELD_NUMBER: _ClassVar[int]
     next_list: ChordNodeReferences
     prev: ChordNodeReference
-    def __init__(self, next_list: _Optional[_Union[ChordNodeReferences, _Mapping]] = ..., prev: _Optional[_Union[ChordNodeReference, _Mapping]] = ...) -> None: ...
+    assigned_id: int
+    def __init__(self, next_list: _Optional[_Union[ChordNodeReferences, _Mapping]] = ..., prev: _Optional[_Union[ChordNodeReference, _Mapping]] = ..., assigned_id: _Optional[int] = ...) -> None: ...
 
 class FileToTransfer(_message.Message):
     __slots__ = ("file", "tags", "location")
@@ -270,11 +274,13 @@ class FilesAllotmentTransferRequest(_message.Message):
     def __init__(self, files: _Optional[_Iterable[_Union[FileToTransfer, _Mapping]]] = ...) -> None: ...
 
 class UpdateFingerTableRequest(_message.Message):
-    __slots__ = ("node_reference", "updates_so_far", "remaining_updates")
+    __slots__ = ("node_reference", "updates_so_far", "remaining_updates", "interval_gap")
     NODE_REFERENCE_FIELD_NUMBER: _ClassVar[int]
     UPDATES_SO_FAR_FIELD_NUMBER: _ClassVar[int]
     REMAINING_UPDATES_FIELD_NUMBER: _ClassVar[int]
+    INTERVAL_GAP_FIELD_NUMBER: _ClassVar[int]
     node_reference: ChordNodeReference
     updates_so_far: int
     remaining_updates: int
-    def __init__(self, node_reference: _Optional[_Union[ChordNodeReference, _Mapping]] = ..., updates_so_far: _Optional[int] = ..., remaining_updates: _Optional[int] = ...) -> None: ...
+    interval_gap: int
+    def __init__(self, node_reference: _Optional[_Union[ChordNodeReference, _Mapping]] = ..., updates_so_far: _Optional[int] = ..., remaining_updates: _Optional[int] = ..., interval_gap: _Optional[int] = ...) -> None: ...

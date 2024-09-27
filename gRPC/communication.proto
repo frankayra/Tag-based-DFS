@@ -81,13 +81,13 @@ service ChordNetworkCommunication{
     rpc i_am_your_next (IAmYourNextRequest) returns (OperationReceived);
     rpc update_next (ChordNodeReference) returns (OperationReceived);
     rpc files_allotment_transfer (FilesAllotmentTransferRequest) returns (OperationResult);
-    rpc update_replication_clique (ChordNodeReferences) returns (OperationResult);
+    rpc update_replication_clique (UpdateReplicationCliqueRequest) returns (OperationResult);
     
     rpc i_am_your_prev (ChordNodeReference) returns (OperationResult);
 
     rpc update_finger_table (UpdateFingerTableRequest) returns (OperationReceived);
     rpc update_finger_table_forward (UpdateFingerTableRequest) returns (OperationReceived);
-    // rpc replication_received (ChordNodeReference) returns (OperationReceived);
+    rpc send_me_your_next_list (Empty) returns (ChordNodeReferences);
 }
 message Empty {}
 
@@ -108,6 +108,7 @@ enum Operation {
     DELETE_TAGS_FROM_REPLICATED_FILES = 13;
     NODE_ENTRANCE_REQUEST = 14;
     UPDATE_FINGER_TABLE = 15;
+    UPDATE_FINGER_TABLE_FORWARD = 16;
 }
 message ServerID {
     int32 serverID = 1;
@@ -188,6 +189,7 @@ message NodeEntranceRequest {
 message IAmYourNextRequest {
     ChordNodeReferences next_list = 1;
     ChordNodeReference prev = 2;
+    optional int32 assigned_id = 3;
 }
 message FileToTransfer {
     FileContent file = 1;
@@ -197,9 +199,15 @@ message FileToTransfer {
 message FilesAllotmentTransferRequest {
     repeated FileToTransfer files = 1;
 }
+message UpdateReplicationCliqueRequest{
+    ChordNodeReferences clique = 1;
+    ChordNodeReference new_leader = 2;
+    ChordNodeReference old_leader = 3;
+}
 message UpdateFingerTableRequest {
     ChordNodeReference node_reference = 1;
     optional int32 updates_so_far = 2;
     optional int32 remaining_updates = 3;
+    optional int32 interval_gap = 4;
 
 }

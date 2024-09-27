@@ -463,6 +463,11 @@ class ChordNetworkCommunicationStub(object):
                 request_serializer=communication__pb2.UpdateFingerTableRequest.SerializeToString,
                 response_deserializer=communication__pb2.OperationReceived.FromString,
                 _registered_method=True)
+        self.send_me_your_next_list = channel.unary_unary(
+                '/TagBasedFileSystem.ChordNetworkCommunication/send_me_your_next_list',
+                request_serializer=communication__pb2.Empty.SerializeToString,
+                response_deserializer=communication__pb2.ChordNodeReferences.FromString,
+                _registered_method=True)
 
 
 class ChordNetworkCommunicationServicer(object):
@@ -633,6 +638,12 @@ class ChordNetworkCommunicationServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def update_finger_table_forward(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def send_me_your_next_list(self, request, context):
         """rpc replication_received (ChordNodeReference) returns (OperationReceived);
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -781,6 +792,11 @@ def add_ChordNetworkCommunicationServicer_to_server(servicer, server):
                     servicer.update_finger_table_forward,
                     request_deserializer=communication__pb2.UpdateFingerTableRequest.FromString,
                     response_serializer=communication__pb2.OperationReceived.SerializeToString,
+            ),
+            'send_me_your_next_list': grpc.unary_unary_rpc_method_handler(
+                    servicer.send_me_your_next_list,
+                    request_deserializer=communication__pb2.Empty.FromString,
+                    response_serializer=communication__pb2.ChordNodeReferences.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -1541,6 +1557,33 @@ class ChordNetworkCommunication(object):
             '/TagBasedFileSystem.ChordNetworkCommunication/update_finger_table_forward',
             communication__pb2.UpdateFingerTableRequest.SerializeToString,
             communication__pb2.OperationReceived.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def send_me_your_next_list(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/TagBasedFileSystem.ChordNetworkCommunication/send_me_your_next_list',
+            communication__pb2.Empty.SerializeToString,
+            communication__pb2.ChordNodeReferences.FromString,
             options,
             channel_credentials,
             insecure,

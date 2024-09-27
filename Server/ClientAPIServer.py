@@ -45,7 +45,7 @@ class ClientAPIServer(communication.ClientAPIServicer):
     
 
         
-    def PushPendingOperation(self, operation_id, operation,  info, steaming = False):
+    def PushPendingOperation(self, operation_id, operation,  info):
             
         self.pending_operations[operation_id] = (operation, info)
         # result = self.chord_client.list(tag_query=[tag for tag in request.tags])
@@ -67,7 +67,8 @@ class ClientAPIServer(communication.ClientAPIServicer):
     def belonging_id(self, searching_id):
         self_id = self.chord_server.node_reference.id
         prev_id = self.chord_server.prev.id
-        return searching_id <= self_id and (prev_id < tag_id or prev_id > self_id)
+        # return searching_id <= self_id and (prev_id < searching or prev_id > self_id)
+        return (prev_id < searching_id <= self_id) or (self_id < prev_id and (searching_id > prev_id or searching_id <= self_id))
         
     
     def list(self, request, context):
@@ -196,7 +197,7 @@ class ClientAPIServer(communication.ClientAPIServicer):
             tag_id = tag_hash % self.chord_server.nodes_count
 
             if self.belonging_id(tag_id):
-                return self.chord_server.delete(request, context)
+                return self.chord_server.delete_tags(request, context)
 
         random_selected_tag = random.choice(tag_query)
         operation_id = int(sha1(random_selected_tag.encode("utf-8")).hexdigest(), 16) 

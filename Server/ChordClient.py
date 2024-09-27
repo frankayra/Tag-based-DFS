@@ -15,6 +15,10 @@ class ChordNodeReference:
         self.id = id
         self.ip = ip
         self.port = port
+    def __hash__(self):
+        return hash(f"{self.id}:{self.ip}:{self.port}")
+    def __eq__(self, node):
+        return isinstance(node, ChordNodeReference) and self.id == node.id and self.ip == node.ip and self.port == node.port
     @property
     def uri_address(self):
         return f"{self.ip}:{self.port}"
@@ -95,45 +99,47 @@ class ChordClient:
                 # Actualizar finger tables
                 case communication_messages.UPDATE_FINGER_TABLE:
                     return stub.update_finger_table(info)
+                case communication_messages.UPDATE_FINGER_TABLE_FORWARD:
+                    return stub.update_finger_table_forward(info)
                 
 
 # CRUD
 # ----------------------------------
-    # def list(self, stub, info): pass
-    # def file_content(self, stub, info): pass
-    # def add_files(self, stub, node_reference, info): pass
-    # def add_tags(self, stub, node_reference, info): pass
-    # def delete(self, stub, node_reference, info): pass
-    # def delete_tags(self, stub, node_reference, info): pass
+    # def list(self, info): pass
+    # def file_content(self, info): pass
+    # def add_files(self, node_reference, info): pass
+    # def add_tags(self, node_reference, info): pass
+    # def delete(self, node_reference, info): pass
+    # def delete_tags(self, node_reference, info): pass
     
 
 # Replication y referencias
 # ----------------------------------
-    def replicate(self, stub, node_reference, info): 
+    def replicate(self, node_reference, info): 
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
             return stub.replicate(info)
-    def send_raw_database_replica(self, stub, node_reference, info):
+    def send_raw_database_replica(self, node_reference, info):
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
             return stub.send_raw_database_replica(info)
-    # def add_references(self, stub, node_reference, info): pass
-    def delete_files_replicas(self, stub, node_reference, info): 
+    # def add_references(self, node_reference, info): pass
+    def delete_files_replicas(self, node_reference, info): 
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
             return stub.delete_files_replicas(info)
-    # def delete_files_references(self, stub, node_reference, info): pass
+    # def delete_files_references(self, node_reference, info): pass
 
 
 # Actualizar Referencias y Replicas (Modificacion de Tags)
 # ----------------------------------
-    # def add_tags_to_refered_files(self, stub, node_reference, info): pass
-    def add_tags_to_replicated_files(self, stub, node_reference, info): 
+    # def add_tags_to_refered_files(self, node_reference, info): pass
+    def add_tags_to_replicated_files(self, node_reference, info): 
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
             return stub.add_tags_to_replicated_files(info)
-    # def delete_tags_from_refered_files(self, stub, node_reference, info): pass
-    def delete_tags_from_replicated_files(self, stub, node_reference, info): 
+    # def delete_tags_from_refered_files(self, node_reference, info): pass
+    def delete_tags_from_replicated_files(self, node_reference, info): 
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
             return stub.delete_tags_from_replicated_files(info)
@@ -141,15 +147,15 @@ class ChordClient:
 
 # Protocolo Heartbeat y AliveRequest (para replicas y nodos proximos respectivamente)
 # ----------------------------------
-    def heartbeat(self, stub, node_reference, info): 
+    def heartbeat(self, node_reference, info): 
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
             return stub.heartbeat(info)
-    def alive_request(self, stub, node_reference, info): 
+    def alive_request(self, node_reference, info): 
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
             return stub.alive_request(info)
-    def unreplicate(self, stub, node_reference, info): 
+    def unreplicate(self, node_reference, info): 
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
             return stub.unreplicate(info)
@@ -157,20 +163,24 @@ class ChordClient:
 
 # Entrada de un nodo a la red
 # ----------------------------------
-    # def node_entrance_request(self, stub, node_reference, info): pass
-    def i_am_your_next(self, stub, node_reference, info): 
+    def node_entrance_request(self, node_reference, info):
+        with grpc.insecure_channel(node_reference.uri_address) as channel:
+            stub = communication.ChordNetworkCommunicationStub(channel)
+            return stub.node_entrance_request(info)
+
+    def i_am_your_next(self, node_reference, info): 
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
             return stub.i_am_your_next(info)
-    def update_next(self, stub, node_reference, info):
+    def update_next(self, node_reference, info):
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
             return stub.update_next(info)
-    def files_allotment_transfer(self, stub, node_reference, info): 
+    def files_allotment_transfer(self, node_reference, info): 
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
             return stub.files_allotment_transfer(info)
-    def update_replication_clique(self, stub, node_reference, info): 
+    def update_replication_clique(self, node_reference, info): 
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
             return stub.update_replication_clique(info)
@@ -178,7 +188,7 @@ class ChordClient:
 
 # Salida de un nodo de la red
 # ----------------------------------
-    def i_am_your_prev(self, stub, node_reference, info): 
+    def i_am_your_prev(self, node_reference, info): 
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
             return stub.i_am_your_prev(info)
@@ -186,12 +196,15 @@ class ChordClient:
 
 # Actualizar finger tables
 # ----------------------------------
-    def update_finger_table(self, stub, node_reference, info): 
+    def update_finger_table(self, node_reference, info): 
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
             return stub.update_finger_table(info)
-    def update_finger_table_forward(self, stub, node_reference, info): 
+    def update_finger_table_forward(self, node_reference, info): 
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
             return stub.update_finger_table_forward(info)
-
+    def send_me_your_next_list(self, node_reference):
+        with grpc.insecure_channel(node_reference.uri_address) as channel:
+            stub = communication.ChordNetworkCommunicationStub(channel)
+            return stub.send_me_your_next_list(communication_messages.Empty())
