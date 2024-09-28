@@ -35,11 +35,11 @@ class ChordClient:
 
 # Operaciones fundamentales de comunicacion
 # ----------------------------------
-    def succesor(self, node_reference:ChordNodeReference, searching_id, requested_operation, operation_id): 
+    def succesor(self, requesting_node:ChordNodeReference, node_reference:ChordNodeReference, searching_id, requested_operation, operation_id): 
         address = node_reference.uri_address
         with grpc.insecure_channel(address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
-            request_message = communication_messages.RingOperationRequest(requesting_node=node_reference.grpc_format, searching_id=searching_id, requested_operation=requested_operation, operation_id=operation_id)
+            request_message = communication_messages.RingOperationRequest(requesting_node=requesting_node.grpc_format, searching_id=searching_id, requested_operation=requested_operation, operation_id=operation_id)
             try:
                 response = stub.succesor(request_message)
                 return response.success
@@ -160,6 +160,7 @@ class ChordClient:
     def node_entrance_request(self, node_reference, info):
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
+            print("hi")
             return stub.node_entrance_request(info)
 
     def i_am_your_next(self, node_reference, info): 
@@ -190,7 +191,7 @@ class ChordClient:
 
 # Actualizar finger tables
 # ----------------------------------
-    def update_finger_table(self, node_reference, info): 
+    def update_finger_table(self, node_reference:ChordNodeReference, info): 
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
             return stub.update_finger_table(info)

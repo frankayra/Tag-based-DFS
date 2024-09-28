@@ -20,7 +20,7 @@ from ChordClient import ChordNodeReference
 
 
 class ChordServer(communication.ChordNetworkCommunicationServicer):
-    def __init__(self, check_for_updates_func, ip: str, port:int = 50052, nodes_count:int = 3, replication_factor = 3, docker_container_name = f'ds-server', server_to_request_entrance:ChordNodeReference = None):
+    def __init__(self, check_for_updates_func, ip: str, port:int = 50052, nodes_count:int = 3, replication_factor = 3, next_alive_check_length = 3, server_to_request_entrance:ChordNodeReference = None):
         
         self.next:list[ChordNodeReference] = []
         self.prev:ChordNodeReference = None
@@ -28,26 +28,10 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         self.nodes_count:int = nodes_count
         self.next_list_size = 0
         self.replication_factor = replication_factor
+        self.next_alive_check_length = next_alive_check_length
         self.check_for_updates_func = check_for_updates_func
         self.chord_client = ChordClient()
 
-        # Resolucion del id
-        self.node_reference = ChordNodeReference(ip, port, -1)
-        claiming_id = random.randint(0, 2**nodes_count)
-        if server_to_request_entrance:
-            info = communication_messages.NodeEntranceRequest(new_node_reference=self.node_reference, claiming_id=claiming_id)
-            important_thread = Thread(target=self.chord_client.node_entrance_request, args=(server_to_request_entrance, info))
-            important_thread.start()
-            while self.node_reference.id == -1:
-                print("Esperando por respuesta para entrada a la red...")
-                time.sleep(1)
-                operating_s = platform.system()
-                if operating_s == "Windows":
-                    os.system('cls')
-                else:
-                    os.system('clear')
-            print(f"id conseguido: {self.node_reference.id}")
-        else: self.node_reference.id = claiming_id
         self.db_physical_files = File_Tag_DB('phisical_storage')
         self.db_replicas = File_Tag_DB('replicas')
         self.db_references = Files_References_DB('references')
@@ -56,6 +40,27 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         self.ready_operations = {}
         self.replication_forest = {}
         
+        # Resolucion del id
+        # -------------------------------
+        self.node_reference = ChordNodeReference(ip, port, -1)
+        # Se inicia el server antes de resolver la id por razones obvias, se necesitan recibir cosas desde el servidor que se le solicito entrada al anillo.
+        serve_thread = Thread(target=self.serve, args=(port,), daemon=True)
+        serve_thread.start()
+        claiming_id = random.randint(0, 2**nodes_count)
+        if server_to_request_entrance:
+            info = communication_messages.NodeEntranceRequest(new_node_reference=self.node_reference.grpc_format, claiming_id=claiming_id)
+            important_thread = Thread(target=self.chord_client.node_entrance_request, args=(server_to_request_entrance, info), daemon=True)
+            important_thread.start()
+            while self.node_reference.id == -1:
+                print("Esperando por respuesta para entrada a la red...")
+                time.sleep(40)
+                operating_s = platform.system()
+                if operating_s == "Windows":
+                    os.system('cls')
+                else:
+                    os.system('clear')
+            print(f"id conseguido: {self.node_reference.id}")
+        else: self.node_reference.id = claiming_id
 
     def serve(self, port=50052):
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=5))
@@ -94,7 +99,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
             print(f"Operacion Realizada: {operation}   => Resultados: {results}")
             if function_to_apply_to_results != print:
                 function_to_apply_to_results(results)
-        checking_for_results_thread = Thread(target=wait_for_results)
+        checking_for_results_thread = Thread(target=wait_for_results, daemon=True)
         def start_thread():
             checking_for_results_thread.start()
             return checking_for_results_thread
@@ -134,7 +139,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         # Vemos si el sucesor que se esta buscando es el nodo actual, si es asi, paramos aqui la busqueda y se envia al nodo solicitante un a solicitud para que prosiga con la operacion para la que se buscaba el responsable del id en cuestion
         if self.belonging_id(request.searching_id):
             # HACK Esto con el hilo asi no estoy del todo seguro que funciona. 
-            continuing_with_operation_thread = Thread(target=self.chord_client.proceed_with_operation, args=(self.node_reference, requesting_node, request.searching_id, request.requested_operation, request.operation_id))
+            continuing_with_operation_thread = Thread(target=self.chord_client.proceed_with_operation, args=(self.node_reference, requesting_node, request.searching_id, request.requested_operation, request.operation_id), daemon=True)
             continuing_with_operation_thread.start()
             return communication_messages.OperationReceived(success=True)
             
@@ -162,7 +167,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         address = next_node.uri_address
         # HACK Esto con el hilo asi no estoy del todo seguro que funciona. 
         # self.chord_client.succesor(next_node, request.searching_id, request.requested_operation, request.operation_id)
-        continuing_with_operation_thread = Thread(target=self.chord_client.succesor, args=(next_node, request.searching_id, request.requested_operation, request.operation_id))
+        continuing_with_operation_thread = Thread(target=self.chord_client.succesor, args=(next_node, request.searching_id, request.requested_operation, request.operation_id), daemon=True)
         continuing_with_operation_thread.start()
         return communication_messages.OperationReceived(success=True)
     def proceed_with_operation(self, request, context):         # TODO Verificar si esto funciona bien tambien para las operaciones que son pusheadas u ordenadas desde el propio ChordServer
@@ -170,7 +175,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         operation = request.requested_operation
         operation_id = request.operation_id
 
-        continuing_with_operation_thread = Thread(target=self.RetakePendingOperation, args=(node_reference, operation, operation_id))
+        continuing_with_operation_thread = Thread(target=self.RetakePendingOperation, args=(node_reference, operation, operation_id), daemon=True)
         continuing_with_operation_thread.start()
         return communication_messages.OperationReceived(success=True)
 
@@ -179,31 +184,21 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
 # ----------------------------------
     def list(self, request, context):                   # ✅
         """TagList {tags: string[]}    =>    FileGeneralInfo {title: string, tag_list: strin[], location: FileLocation {file_hash:int, location_hash: int}}"""
+        
         files_list = []
         tag_query = [tag for tag in request.tags]
         recovered_files = self.db_physical_files.RecoveryFilesInfo_ByTagQuery(tag_query, include_tags=True)
         recovered_files_references = self.db_references.RecoveryFilesInfo_ByTagQuery(tag_query, include_tags=True)
 
-        for item in recovered_files:
-            files_list.append(item)
-        for item in recovered_files_references:
-            files_list.append(item)
+        for file in recovered_files:
+            files_list.append(file)
+        for file in recovered_files_references:
+            files_list.append(file)
 
-        try:
-            first_file = next(files_list)
-            file_name, file_hash, file_location_hash, file_tags = first_file[0], first_file[1], first_file[2], first_file[3]
-            yield communication_messages.FileGeneralInfo(title=file_name,
-                                                            tag_list=file_tags,
-                                                            location=communication_messages.FileLocation(file_hash=file_hash, 
-                                                                                                            location_hash=file_location_hash))
-        except StopIteration:
-            print("No se encontraron archivos")
-            yield communication_messages.FileGeneralInfo(title="file_name not found",
-                                                            tag_list=[],
-                                                            location=communication_messages.FileLocation(file_hash='-1', 
-                                                                                                            location_hash=-1))
-            return
+        empty_file_list = True
+
         for file in files_list:
+            empty_file_list = False
             file_name = file[0]
             file_hash = file[1]
             file_location_hash = file[2]
@@ -213,6 +208,12 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
                                                             tag_list=file_tags,
                                                             location=communication_messages.FileLocation(file_hash=file_hash, 
                                                                                                             location_hash=file_location_hash))
+        if empty_file_list:
+            print("No se encontraron archivos")
+            yield communication_messages.FileGeneralInfo(title="file_name not found",
+                                                            tag_list=[],
+                                                            location=communication_messages.FileLocation(file_hash='-1', 
+                                                                                                            location_hash=-1))
 
         ##### DEBUG #####
         print("\n-------- DEBUG MODE INFO--------")
@@ -324,11 +325,15 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         # Fijarse que aqui tambien se filtra, o entra, cuando el id que se reclama coincide con el del nodo actual. En este caso se sigue buscando
         #   otro id libre en la red segun mi algoritmo de encontrar id libre para un nuevo nodo.
         if self.belonging_id(request.claiming_id):
-            if request.claiming_id != self.node_reference.id or not self.prev:
-                entrance_node_reference = request.new_node_reference
+            if request.claiming_id != self.node_reference.id or (not self.prev):
+                print("hi hi hi h ih i hih i hi hih")
+                entrance_node_reference = ChordNodeReference(ip=request.new_node_reference.ip, port=request.new_node_reference.port, id=request.new_node_reference.id)
 
-
-                continuing_operation_thread = Thread(target=self.Resolve_NodeEntrance, args=(entrance_node_reference, request.claiming_id))
+                # Aqui le asignamos un id al otro lado del anillo (a distancia igual a la mitad del tamaño del anillo que es 2**self.nodes_count / 2 o lo que es lo mismo 2**(self.nodes_count -1))
+                #   en caso de que el nodo este queriendo entrar al mismo con un id igual al nodo actual. En otro caso se le da el mismo id, por simplicidad.
+                # Fijarse que esta condicion se puede cumplir si se entro en el if por la condicion de 'not self.prev'.
+                assigned_id = request.claiming_id if request.claiming_id != self.node_reference.id else self.apply_offset(self.node_reference.id, 2**(self.nodes_count -1))
+                continuing_operation_thread = Thread(target=self.Resolve_NodeEntrance, args=(entrance_node_reference, request.claiming_id), daemon=True)
                 continuing_operation_thread.start()
                 return communication_messages.OperationResult(success=True, message="Se encontro un hueco para el nuevo nodo")
             
@@ -351,23 +356,27 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         # Caso en que habiamos encontrado en next[] un intervalo o espacio vacio, y vamos a enviar la solicitud hacia el nodo siguiente, responsable del id escogido en dicho espacio vacio.
         if next_node:
             info = communication_messages.NodeEntranceRequest(new_node_reference=request.new_node_reference, claiming_id=new_claiming_id)
-            continuing_operation_thread = Thread(target=self.chord_client.node_entrance_request, args=(next_node, info))
+            continuing_operation_thread = Thread(target=self.chord_client.node_entrance_request, args=(next_node, info), daemon=True)
             continuing_operation_thread.start()
             return communication_messages.OperationResult(success=True, message="Seguimos buscando un hueco para el nuevo nodo")
         
         # Caso en que no se encontro id libre en next[] y se procede a seguir con el algoritmo para encontrar hueco libre, ahora buscando un id random
         #   que inteligentemente no este en el intervalo de ids del nodo actual hasta el id del ultimo nodo de next[] (next[-1]).
-        if self.node_reference.id < self.next[self.next_list_size-1]: # Esto pasa cuando el id de next[-1] no ha dado un salto en el final del anillo.
+        if self.node_reference.id < self.next[self.next_list_size-1].id: # Esto pasa cuando el id de next[-1] no ha dado un salto en el final del anillo.
             if self.next[self.next_list_size-1].id == 2**self.nodes_count -1: # Esto es cuando el ultimo nodo de next[] tiene id igual al ultimo id posible del anillo, en este caso no es necesario tener en cuenta el intervalo de next[-1] al final del anillo.
                 new_claiming_id = random.randint(0, self.node_reference.id)
             else:
                 new_claiming_id = random.choice([random.randint(0, self.node_reference.id), random.randint(self.next[self.next_list_size-1].id +1, 2**self.nodes_count)])
         else: 
             new_claiming_id = random.randint(self.next[self.next_list_size-1] +1, self.node_reference.id)
-        new_claiming_id
+        
+        operation_id = random.randint(1, 10000000000)
         info = communication_messages.NodeEntranceRequest(new_node_reference=request.new_node_reference, claiming_id=new_claiming_id)
-        continuing_operation_thread = Thread(target=self.chord_client.node_entrance_request, args=(next_node, info))
+        wait_for_results = self.PushPendingOperation(operationid=operation_id, operation=communication_messages.NODE_ENTRANCE_REQUEST, info=info)
+        info = communication_messages.RingOperationRequest(requesting_node=self.node_reference.grpc_format, searching_id=new_claiming_id, requested_operation=communication_messages.NODE_ENTRANCE_REQUEST, operation_id=operation_id)
+        continuing_operation_thread = Thread(target=self.succesor, args=(info, context), daemon=True)
         continuing_operation_thread.start()
+        wait_for_results()
         return communication_messages.OperationResult(success=True, message="Seguimos buscando un hueco para el nuevo nodo")
         
 
@@ -379,14 +388,14 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         
         # Actualizamos el id del nodo actual con la id que se asigno en el proceso de busqueda del anillo, asi como la lista next[] y prev
         self.next.clear()
-        for node in request.next_list:
+        for node in request.next_list.references:
             self.next.append(ChordNodeReference(ip=node.ip, port=node.port, id=node.id))
         self.prev = ChordNodeReference(ip=request.prev.ip, port=request.prev.port, id=request.prev.id)
         self.node_reference.id = request.assigned_id
 
         # Enviamos la referencia del nodo actual al nuevo nodo prev para que actualice su lista next[]
         info = self.node_reference.grpc_format
-        update_prev_thread = Thread(target=self.chord_client.update_next, args=info)
+        update_prev_thread = Thread(target=self.chord_client.update_next, args=(self.prev, info), daemon=True)
         update_prev_thread.start()
 
         # Pedimos al nuevo nodo proximo (next[0]) que le envie al nodo actual los archivos que le tocan
@@ -405,7 +414,11 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
 
 
         
-    # def update_next(self, request, context): pass
+    def update_next(self, request, context): 
+        if len(self.next) >= self.next_alive_check_length:
+            self.next.pop()
+        self.next.insert(0, ChordNodeReference(ip=request.ip, port=request.port, id=request.id))
+        return communication_messages.OperationReceived(success=True)
     def files_allotment_transfer(self, request, context): pass
     def update_replication_clique(self, request, context): pass
 
@@ -444,7 +457,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
                 (updates_so_far>0 and self.id_in_between(self_id, pivot_id - 2**(updates_so_far -1), next_id)) or # ya habiamos pasado por ahi actualizando
                 self.gap(gap_beginning, next_id) > request.interval_gap): # no hay posibilidad de que next[i] apunte al intervalo (pivot, new_node]
                 break
-            update_finger_table_forward_thread = Thread(target=self.chord_client.update_finger_table_forward, args=(info,))
+            update_finger_table_forward_thread = Thread(target=self.chord_client.update_finger_table_forward, args=(info,), daemon=True)
             update_finger_table_forward_thread.start()
 
         # Verificando si existe algun otro nodo mas adelante de next, que aun pueda apuntar al intervalo. wl el while lo que hace es basicamente iterar por los nodos
@@ -464,7 +477,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
                     (updates_so_far>0 and self.id_in_between(self_id, pivot_id - 2**(updates_so_far -1), next_id)) or # ya habiamos pasado por ahi actualizando
                     self.gap(gap_beginning, next_id) > request.interval_gap): # no hay posibilidad de que next[i] apunte al intervalo (pivot, new_node]
                     break
-                update_finger_table_forward_thread = Thread(target=self.chord_client.update_finger_table_forward, args=(info,))
+                update_finger_table_forward_thread = Thread(target=self.chord_client.update_finger_table_forward, args=(info,), daemon=True)
                 update_finger_table_forward_thread.start()
 
         # Chequeando hacia atras con pasos logaritmicos
@@ -483,7 +496,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         operation_id = random.randint(1, 10000000000000)
         info = communication_messages.UpdateFingerTableRequest(node_reference=request.node_reference, updates_so_far=updates_so_far+1, interval_gap=request.interval_gap)
         wait_for_results = self.PushPendingOperation(operation_id=operation_id, operation=communication_messages.UPDATE_FINGER_TABLE, info=info)
-        succesor_thread = Thread(target=self.chord_client.succesor, args=(self.node_reference, next_id, communication_messages.UPDATE_FINGER_TABLE))
+        succesor_thread = Thread(target=self.chord_client.succesor, args=(self.node_reference, next_id, communication_messages.UPDATE_FINGER_TABLE), daemon=True)
         succesor_thread.start()
         wait_for_results() # Esto al final lo que hace es printear el resultado de la operacion de 'update_finger_table' que se le hace al proximo nodo
         
@@ -523,24 +536,25 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
 
         # Enviandole al nodo entrante, la informacion de entrada a la red, como el id que se fue asignado, asi como sus nodos proximos y su nodo anterior en el anillo.
         next_list = [communication_messages.ChordNodeReference(n.id, n.ip, n.port) for n in self.next[:max(0, self.next_list_size - 1)]] # En caso de que el nodo actual no tenga a nadie en next, aqui habra una lista vacia y mas adelante se agregara el mismo para enviarselo al nodo entrante
-        next_list.insert(0, self.node_reference)
+        next_list.insert(0, self.node_reference.grpc_format)
         prev = self.prev.grpc_format if self.prev else self.node_reference.grpc_format
         info = communication_messages.IAmYourNextRequest(next_list=communication_messages.ChordNodeReferences(references=next_list), 
                                                             prev=prev,
                                                             assigned_id=assigned_id)
         response = self.chord_client.i_am_your_next(entrance_node_reference, info) # En este metodo realizamos las llamadas sincronas y secuenciales porque hace falta dar un seguimiento de las operaciones.
         if not response.success: return
-        if not self.prev: # Si el nodo actual es el unico en la red, ahora su proximo y su anterior es el mismo, y es el nodo que esta entrando en la red.
-            self.prev = entrance_node_reference
-            self.next.append(entrance_node_reference)
+        if self.prev:
+            pivot_id = self.prev.id
+            interval_gap = self.gap(pivot_id, entrance_node_reference.id)
+            info = communication_messages.UpdateFingerTableRequest(node_reference=communication_messages.ChordNodeReference(id=entrance_node_reference.id, ip=entrance_node_reference.ip, port=entrance_node_reference.port),
+                                                                        updates_so_far=0, remaining_updates=self.nodes_count, interval_gap=interval_gap)
+            # HACK No se si con esto sera suficiente o correcto
+            self.chord_client.update_finger_table(node_reference=self.prev, info=info)
+        # else: # Si el nodo actual es el unico en la red, ahora su proximo y su anterior es el mismo, y es el nodo que esta entrando en la red.
+            # self.next.append(entrance_node_reference)  # NOTE No se actualiza la lista next[] porque ya de eso se encarga update_next, que en este caso se mandaria para este mismo nodo cuando se le envie al nodo entrante la solicitud de i_am_your_next porque el nodo actual es su prev ademas de ser su sucesor
 
+        self.prev = entrance_node_reference
         # Le pedimos a prev que actualice su finger table, y que siga el con las actualizaciones, segun mi algoritmo de actualizacion de fingers tables.
-        pivot_id = self.prev.id
-        interval_gap = self.gap(pivot_id, entrance_node_reference.id)
-        info = communication_messages.UpdateFingerTableRequest(node_reference=communication_messages.ChordNodeReference(id=entrance_node_reference.id, ip=entrance_node_reference.ip, port=entrance_node_reference.port),
-                                                                    updates_so_far=0, remaining_updates=self.nodes_count, interval_gap=interval_gap)
-        # HACK No se si con esto sera suficiente o correcto
-        self.chord_client.update_finger_table(node_reference=self.prev, info=info)
 
         # Realizando las operaciones:'files_allotment_transfer', 'update_replication_clique' y 'unreplicate'
         # ----------------------------------------

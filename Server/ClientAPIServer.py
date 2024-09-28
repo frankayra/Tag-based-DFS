@@ -18,7 +18,7 @@ from ChordClient import ChordClient, ChordNodeReference
 
 
 class ClientAPIServer(communication.ClientAPIServicer):
-    def __init__(self, port:int = 50051, nodes_count:int = 8):
+    def __init__(self, port:int = 50051, nodes_count:int = 3, replication_factor = 3, next_alive_check_length = 3, server_to_request_entrance:ChordNodeReference = None):
         ip = "localhost"
         self.port=port
         self.chord_server = ChordServer(
@@ -26,9 +26,9 @@ class ClientAPIServer(communication.ClientAPIServicer):
                                         ip=ip,
                                         port= port+1, 
                                         nodes_count= nodes_count,
-                                        replication_factor= 1,
-                                        # docker_container_name='ds-server',
-                                        server_to_request_entrance=None
+                                        replication_factor= replication_factor,
+                                        next_alive_check_length= next_alive_check_length,
+                                        server_to_request_entrance=server_to_request_entrance
                                         )
         self.chord_client = self.chord_server.chord_client
 
@@ -36,6 +36,10 @@ class ClientAPIServer(communication.ClientAPIServicer):
         self.ready_operations = self.chord_server.ready_operations
         
         self.active_threads = 0
+        serve_thread = Thread(target=self.serve, daemon=True)
+        serve_thread.start()
+    
+
     
 
     def serve(self):
@@ -50,7 +54,7 @@ class ClientAPIServer(communication.ClientAPIServicer):
         result = None
         while(True):
             time.sleep(0.05)
-            result = self.ready_operations.get(id, None)
+            result = self.chord_server.ready_operations.get(id, None)
             if result: return
     
 
@@ -90,8 +94,10 @@ class ClientAPIServer(communication.ClientAPIServicer):
         for tag in tag_query:
             tag_id = int(sha1(tag.encode("utf-8")).hexdigest(), 16) % (2**self.chord_server.nodes_count)
             if self.belonging_id(tag_id):
-                print("hi")
-                return self.chord_server.list(request, context)
+                results = self.chord_server.list(request, context)
+                for file in results:
+                    yield file
+                return
             
         random_selected_tag = random.choice(tag_query)
         random_selected_tag_hash = int(sha1(random_selected_tag.encode("utf-8")).hexdigest(), 16) % (2**self.chord_server.nodes_count)
@@ -157,7 +163,7 @@ class ClientAPIServer(communication.ClientAPIServicer):
         
     def addTags(self, request, context):
         """TagQuery {tag_query: string[], operation_tags}    =>    OperationResult {success: bool, message: string}"""
-        tag_query = [tag for tag in request.tag_query]
+        tag_query = [tag for tag in request.tags_query]
         for tag in tag_query:
             tag_hash = int(sha1(tag.encode('utf-8')).hexdigest(), 16)
             tag_id = tag_hash % (2**self.chord_server.nodes_count)
