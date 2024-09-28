@@ -30,12 +30,6 @@ class ChordNodeReference:
         return communication_messages.ChordNodeReference(id=self.id, ip=self.ip, port=self.port)
     
 class ChordClient:
-    def __init__(self, nodes_count:int = 8): pass
-
-
-
-
-
 
 
 

@@ -4,6 +4,8 @@ from hashlib import sha1
 import socket
 from concurrent import futures
 from threading import Thread
+import os
+import platform
 
 
 import logging
@@ -13,44 +15,54 @@ import grpc
 from gRPC import communication_pb2 as communication_messages
 from gRPC import communication_pb2_grpc as communication
 from DB import File_Tag_DB, Files_References_DB
-from . import ChordClient
-from .ChordClient import ChordNodeReference
+from ChordClient import ChordClient
+from ChordClient import ChordNodeReference
 
 
 class ChordServer(communication.ChordNetworkCommunicationServicer):
-    def __init__(self, check_for_updates_func, port:int = 50052, nodes_count:int = 3, replication_factor = 3, docker_container_name = f'ds-server'):
-        # self.id = 0                                                     # TODO
-        self.check_for_updates_func = check_for_updates_func
-        self.running_on_docker_container = False
-        running_on_docker_container_input = input("Estas iniciando desde un contenedor Docker??(Si|No) ")
-        match running_on_docker_container_input.casefold():
-            case "si": self.running_on_docker_container = True
-            case "no": self.running_on_docker_container = False
-        ip = socket.gethostbyname(socket.gethostname()) if not running_on_docker_container else docker_container_name
-        self.node_reference = ChordNodeReference(ip, port, self.id)           # TODO hacer un metodo aparte para inicializar el nodo con un id
+    def __init__(self, check_for_updates_func, ip: str, port:int = 50052, nodes_count:int = 3, replication_factor = 3, docker_container_name = f'ds-server', server_to_request_entrance:ChordNodeReference = None):
+        
         self.next:list[ChordNodeReference] = []
         self.prev:ChordNodeReference = None
         self.finger_table:list[ChordNodeReference] = []
         self.nodes_count:int = nodes_count
         self.next_list_size = 0
         self.replication_factor = replication_factor
-        
+        self.check_for_updates_func = check_for_updates_func
+        self.chord_client = ChordClient()
+
+        # Resolucion del id
+        self.node_reference = ChordNodeReference(ip, port, -1)
+        claiming_id = random.randint(0, 2**nodes_count)
+        if server_to_request_entrance:
+            info = communication_messages.NodeEntranceRequest(new_node_reference=self.node_reference, claiming_id=claiming_id)
+            important_thread = Thread(target=self.chord_client.node_entrance_request, args=(server_to_request_entrance, info))
+            important_thread.start()
+            while self.node_reference.id == -1:
+                print("Esperando por respuesta para entrada a la red...")
+                time.sleep(1)
+                operating_s = platform.system()
+                if operating_s == "Windows":
+                    os.system('cls')
+                else:
+                    os.system('clear')
+            print(f"id conseguido: {self.node_reference.id}")
+        else: self.node_reference.id = claiming_id
         self.db_physical_files = File_Tag_DB('phisical_storage')
         self.db_replicas = File_Tag_DB('replicas')
         self.db_references = Files_References_DB('references')
         
-        self.chord_client = ChordClient(nodes_count)
         self.pending_operations = {}
         self.ready_operations = {}
         self.replication_forest = {}
         
 
-    def serve(self, port='50052'):
-        server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+    def serve(self, port=50052):
+        server = grpc.server(futures.ThreadPoolExecutor(max_workers=5))
         communication.add_ChordNetworkCommunicationServicer_to_server(self, server)
-        server.add_insecure_port("[::]:" + port)
+        server.add_insecure_port("[::]:" + str(port))
         server.start()
-        print("Chord Server iniciado, escuchando en el puerto " + port)
+        print("Chord Server iniciado, escuchando en el puerto " + str(port))
         server.wait_for_termination()
 
     def RetakePendingOperation(self, node_reference, operation, operation_id):
@@ -85,6 +97,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         checking_for_results_thread = Thread(target=wait_for_results)
         def start_thread():
             checking_for_results_thread.start()
+            return checking_for_results_thread
         return start_thread
 
     def belonging_id(self, searching_id):
@@ -218,7 +231,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
     def add_files(self, request, context):              # ✅
         """FilesToAddWithLocation {files: FileContent[] {title: string, content: string}, tags: string[], location_hash: int}    =>    OperationResult {success: bool, message: string}"""
         try:
-            add_files_message = self.db_physical_files.AddFiles([(file.title, file.content) for file in request.files], [tag for tag in request.tags], location_hash)
+            add_files_message = self.db_physical_files.AddFiles([(file.title, file.content) for file in request.files], [tag for tag in request.tags], request.location_hash)
             return communication_messages.OperationResult(success=True, message=f"Archivos añadidos satisfactoriamente: {add_files_message}")
         except Exception as e:
             return communication_messages.OperationResult(success=False, message=f"Error al añadir los archivos solicitados: {e}")
@@ -431,7 +444,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
                 (updates_so_far>0 and self.id_in_between(self_id, pivot_id - 2**(updates_so_far -1), next_id)) or # ya habiamos pasado por ahi actualizando
                 self.gap(gap_beginning, next_id) > request.interval_gap): # no hay posibilidad de que next[i] apunte al intervalo (pivot, new_node]
                 break
-            update_finger_table_forward_thread = Thread(target=self.chord_client.update_finger_table_forward, args=(info))
+            update_finger_table_forward_thread = Thread(target=self.chord_client.update_finger_table_forward, args=(info,))
             update_finger_table_forward_thread.start()
 
         # Verificando si existe algun otro nodo mas adelante de next, que aun pueda apuntar al intervalo. wl el while lo que hace es basicamente iterar por los nodos
@@ -451,7 +464,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
                     (updates_so_far>0 and self.id_in_between(self_id, pivot_id - 2**(updates_so_far -1), next_id)) or # ya habiamos pasado por ahi actualizando
                     self.gap(gap_beginning, next_id) > request.interval_gap): # no hay posibilidad de que next[i] apunte al intervalo (pivot, new_node]
                     break
-                update_finger_table_forward_thread = Thread(target=self.chord_client.update_finger_table_forward, args=(info))
+                update_finger_table_forward_thread = Thread(target=self.chord_client.update_finger_table_forward, args=(info,))
                 update_finger_table_forward_thread.start()
 
         # Chequeando hacia atras con pasos logaritmicos
