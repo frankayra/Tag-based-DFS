@@ -18,8 +18,7 @@ from ChordClient import ChordClient, ChordNodeReference
 
 
 class ClientAPIServer(communication.ClientAPIServicer):
-    def __init__(self, port:int = 50051, nodes_count:int = 3, replication_factor = 3, next_alive_check_length = 3, server_to_request_entrance:ChordNodeReference = None):
-        ip = "localhost"
+    def __init__(self, ip = "localhost", port:int = 50051, nodes_count:int = 3, replication_factor = 3, next_alive_check_length = 3, server_to_request_entrance:ChordNodeReference = None):
         self.port=port
         self.chord_server = ChordServer(
                                         check_for_updates_func= self.check_for_ready_operation, 

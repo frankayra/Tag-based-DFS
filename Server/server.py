@@ -3,6 +3,8 @@ import time
 import re
 import platform
 import os
+import sys
+import socket
 
 
 
@@ -15,6 +17,47 @@ from ClientAPIServer import ClientAPIServer
 
 
 if __name__ == '__main__':
+    parameters = sys.argv
+    server_to_request_entrance = None
+    nodes_count = 3
+    replication_factor = 2
+    next_alive_check_length = 2
+       
+    if len(parameters) == 2:
+        if parameters[1] == "localhost":
+            ip = "localhost"
+            port = 50051
+        elif parameters[1] == "localgest":
+            ip = "localhost"
+            server_to_request_entrance = ChordNodeReference(ip="localhost", port=50052, id=-1) 
+
+            # Autodescubrimiento de puertos
+            # with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            #     s.settimeout(1)
+            #     for test_port in range(50051, 50200):
+
+            #         try:
+            #             s.connect(("localhost", test_port)) # s.bind((host, puerto))
+            #             print(f"puerto {test_port} ocupado")
+            #         except socket.error:
+            #             port = test_port
+            #             break
+
+            port = 50053
+    elif len(parameters) == 3:
+        port = int(parameters[1])
+        entrance_request_address = parameters[2]
+        exp = r'^(?P<ip>[\w\.]+):(?P<port>[\d]+)$'
+        coincidence = re.match(exp, entrance_request_address)
+        if coincidence:
+            server_to_request_entrance = ChordNodeReference(ip=coincidence.group('ip'), port=coincidence.group('port'), id=-1) 
+                
+    api_server = ClientAPIServer(ip, port, nodes_count, replication_factor, next_alive_check_length, server_to_request_entrance)
+
+
+
+
+    
     # nodes_count = int(input("Cantidad de bits de identificador: "))
     # replication_factor = int(input("factor de replicacion: "))
     # while(replication_factor > 2**nodes_count):
@@ -32,36 +75,50 @@ if __name__ == '__main__':
     
 
     ######### Propiedades globales ##########
-    nodes_count = 3
-    replication_factor = 2
-    next_alive_check_length = 2
+    # nodes_count = 3
+    # replication_factor = 2
+    # next_alive_check_length = 2
 
     ######### Primer Nodo ##########
     # port = 50051
     # server_to_request_entrance = None
 
     ######### Nodo entrante ##########
-    port = 50053
-    server_to_request_entrance = ChordNodeReference("localhost", 50052, -1)
+    # port = 50053
+    # server_to_request_entrance = ChordNodeReference("localhost", 50052, -1)
 
 
 
     
     
-    api_server = ClientAPIServer(port, nodes_count, replication_factor, server_to_request_entrance)
-    time.sleep(1)
+    # api_server = ClientAPIServer(port, nodes_count, replication_factor, next_alive_check_length, server_to_request_entrance)
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+    time.sleep(5)
     try:
         while True:
-            time.sleep(1)  # Mantener el hilo principal activo
-            operating_s = platform.system()
-            if operating_s == "Windows":
-                os.system('cls')
-            else:
-                os.system('clear')
+            # operating_s = platform.system()
+            # if operating_s == "Windows":
+            #     os.system('cls')
+            # else:
+            #     os.system('clear')
             print(f"mi id es: {api_server.chord_server.node_reference.id}")
             print("proximos: ", [f"{n.ip}:{n.port}  " for n in api_server.chord_server.next])
             if api_server.chord_server.prev:
                 print("anterior: ", f"{api_server.chord_server.prev.ip}:{api_server.chord_server.prev.port}")
+            time.sleep(2)  # Mantener el hilo principal activo
     except KeyboardInterrupt:
         print("Interrupción recibida. Saliendo del programa.")
 
