@@ -50,6 +50,7 @@ if __name__ == '__main__':
         exp = r'^(?P<ip>[\w\.]+):(?P<port>[\d]+)$'
         coincidence = re.match(exp, entrance_request_address)
         if coincidence:
+            ip = "localhost"
             server_to_request_entrance = ChordNodeReference(ip=coincidence.group('ip'), port=coincidence.group('port'), id=-1) 
                 
     api_server = ClientAPIServer(ip, port, nodes_count, replication_factor, next_alive_check_length, server_to_request_entrance)
@@ -115,10 +116,10 @@ if __name__ == '__main__':
             # else:
             #     os.system('clear')
             print(f"mi id es: {api_server.chord_server.node_reference.id}")
-            print("proximos: ", [f"{n.ip}:{n.port}  " for n in api_server.chord_server.next])
+            print("proximos: ", [f"{n.id}--> {n.ip}:{n.port} " for n in api_server.chord_server.next])
             if api_server.chord_server.prev:
-                print("anterior: ", f"{api_server.chord_server.prev.ip}:{api_server.chord_server.prev.port}")
-            time.sleep(2)  # Mantener el hilo principal activo
+                print("anterior: ", f"{api_server.chord_server.prev.id}--> {api_server.chord_server.prev.ip}:{api_server.chord_server.prev.port}")
+            time.sleep(20)  # Mantener el hilo principal activo
     except KeyboardInterrupt:
         print("Interrupción recibida. Saliendo del programa.")
 

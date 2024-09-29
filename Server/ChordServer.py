@@ -47,12 +47,13 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         serve_thread.start()
         claiming_id = random.randint(0, 2**nodes_count)
         if server_to_request_entrance:
+            print(f"reclamando el id: {claiming_id}")
             info = communication_messages.NodeEntranceRequest(new_node_reference=self.node_reference.grpc_format, claiming_id=claiming_id)
             entrance_request_thread = Thread(target=self.chord_client.node_entrance_request, args=(server_to_request_entrance, info), daemon=True)
             entrance_request_thread.start()
             while self.node_reference.id == -1:
                 print("Esperando por respuesta para entrada a la red...")
-                time.sleep(40)
+                time.sleep(1)
                 operating_s = platform.system()
                 if operating_s == "Windows":
                     os.system('cls')
@@ -110,12 +111,17 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
 
     def belonging_id(self, searching_id):
         if not self.prev:
+            print("El id pertenece, porque no tengo a mas nadie en el anillo")
             return True
         self_id = self.node_reference.id
         prev_id = self.prev.id
         # prev_id  <   searching_id   <=   self_id
         # return searching_id <= self_id and (prev_id < searching_id or prev_id > self_id)        # BUG Esto da un falso negativo en el caso de que este self_id con un id de los primeros y prev_id con uno de los ultimos, y caiga searching_id entre los dos pero del lado de prev_id, de los mayores ids.
-        return (prev_id < searching_id <= self_id) or (self_id < prev_id and (searching_id > prev_id or searching_id <= self_id))
+        response = (prev_id < searching_id <= self_id) or (self_id < prev_id and (searching_id > prev_id or searching_id <= self_id))
+        
+        if response:    print(f"El id {searching_id} ((SI))esta en [{self.prev.id}, {self.node_reference.id}]")
+        else:           print(f"El id {searching_id} ((NO)) esta en [{self.prev.id}, {self.node_reference.id}]")
+        return response
     def id_in_between(self, base_id, id_to_be_surpassed, base_id_offset):
         # return base_id_offset >= id_to_be_surpassed or base_id_offset < base_id     # BUG Esto se parte en el caso de que esten base_id_offset y base_id en el final del anillo, y id_to_be_suprpassed este por el principio, este caso da verdadero por la primera condicion y este ejemplo seria un falso positivo.
         return (base_id < id_to_be_surpassed <= base_id_offset) or (base_id_offset < base_id and (id_to_be_surpassed > base_id or id_to_be_surpassed <= base_id_offset))
@@ -323,7 +329,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
 
 # Entrada de un nodo a la red
 # ----------------------------------
-    def node_entrance_request(self, request, context):  # ✅
+    def node_entrance_request(self, request, context):  
         print("Entre en node_entrance_request")
         
         # Verificando si se puede dar de alta al nuevo nodo aqui mismo.
@@ -333,7 +339,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         #   otro id libre en la red segun mi algoritmo de encontrar id libre para un nuevo nodo.
         if self.belonging_id(request.claiming_id):
             if request.claiming_id != self.node_reference.id or (not self.prev):
-                entrance_node_reference = ChordNodeReference(ip=request.new_node_reference.ip, port=request.new_node_reference.port, id=request.new_node_reference.id)
+                entrance_node_reference = ChordNodeReference(ip=request.new_node_reference.ip, port=request.new_node_reference.port, id=request.claiming_id)
 
                 # Aqui le asignamos un id al otro lado del anillo (a distancia igual a la mitad del tamaño del anillo que es 2**self.nodes_count / 2 o lo que es lo mismo 2**(self.nodes_count -1))
                 #   en caso de que el nodo este queriendo entrar al mismo con un id igual al nodo actual. En otro caso se le da el mismo id, por simplicidad.
@@ -559,12 +565,12 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
 # Metodos aunxiliares de los oficiales para evitar reguero
 # ----------------------------------
     def Resolve_NodeEntrance(self, entrance_node_reference: ChordNodeReference, assigned_id):  # TODO Añadir las operaciones 'files_allotment_transfer', 'update_replication_clique' y 'unreplicate' y luego transferir sus archivos de almacenamiento a referencias.
+        print("Entre en Resolve_Entrance")
         # if self.prev == None or len(self.next) == 0:      # TODO
 
         # Enviandole al nodo entrante, la informacion de entrada a la red, como el id que se fue asignado, asi como sus nodos proximos y su nodo anterior en el anillo.
         next_list = [n.grpc_format for n in self.next[:max(0, len(self.next) - 1)]] # En caso de que el nodo actual no tenga a nadie en next, aqui habra una lista vacia y mas adelante se agregara el mismo para enviarselo al nodo entrante
         next_list.insert(0, self.node_reference.grpc_format)
-        print("llegue aqui cojone")
         prev = self.prev.grpc_format if self.prev else self.node_reference.grpc_format
         info = communication_messages.IAmYourNextRequest(next_list=communication_messages.ChordNodeReferences(references=next_list), 
                                                             prev=prev,
