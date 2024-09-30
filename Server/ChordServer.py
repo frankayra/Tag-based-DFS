@@ -455,14 +455,19 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         self_id = self.node_reference.id
         gap_beginning = self.apply_offset(pivot_id, -(2**updates_so_far))
 
-        # Ya se hicieron todos los saltos hacia atras actualizando
+        # Comprobando si ya se hicieron todos los saltos hacia atras actualizando las finger tables.
         if updates_so_far >= self.nodes_count: return communication_messages.OperationReceived(success=True)
 
+        # Añadiendo el nodo a la finger table si queda hueco en la misma
+        # -----------------------------------------------------
+        if len(self.finger_table) < self.nodes_count and self.id_in_between(pivot_id, self.apply_offset(self_id, 2**len(self.finger_table)), new_node_id):
+            self.finger_table.append(request.node_reference)
         # Chequeando las referencias de la finger table del nodo actual, y cambiando las que apunten al rango (pivot_id, new_node_id]
         # -----------------------------------------------------
-        for i in range(len(self.finger_table)):
-            if self.id_in_between(pivot_id, self.apply_offset(self_id, 2**i), new_node_id):
-                self.finger_table[i] = ChordNodeReference(ip=request.node_reference.ip, port=request.node_reference.port, id=request.node_reference.id)
+        else:
+            for i in range(len(self.finger_table)):
+                if self.id_in_between(pivot_id, self.apply_offset(self_id, 2**i), new_node_id):
+                    self.finger_table[i] = ChordNodeReference(ip=request.node_reference.ip, port=request.node_reference.port, id=request.node_reference.id)
         
         # Chequeando hacia alante con pasos pequeños
         # -----------------------------------------------------
@@ -471,7 +476,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         for i in range(len(self.next)):
             next_id = self.next[i].id
             if (next_id == pivot_id or # el i-esimo indice es pivot(el anterior al nuevo nodo). Este nodo
-                (updates_so_far>0 and self.id_in_between(self_id, pivot_id - 2**(updates_so_far -1), next_id)) or # ya habiamos pasado por ahi actualizando
+                (updates_so_far>0 and self.id_in_between(self_id, self.apply_offset(pivot_id, -(2**(updates_so_far -1))), next_id)) or # ya habiamos pasado por ahi actualizando
                 self.gap(gap_beginning, next_id) > request.interval_gap): # no hay posibilidad de que next[i] apunte al intervalo (pivot, new_node]
                 break
             update_finger_table_forward_thread = Thread(target=self.chord_client.update_finger_table_forward, args=(self.next[i], info), daemon=True)
@@ -491,7 +496,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
             for node_ref in next_list:
                 next_id = node_ref.id
                 if (next_id == pivot_id or # el i-esimo indice es pivot(el anterior al nuevo nodo). Este nodo
-                    (updates_so_far>0 and self.id_in_between(self_id, pivot_id - 2**(updates_so_far -1), next_id)) or # ya habiamos pasado por ahi actualizando
+                    (updates_so_far>0 and self.id_in_between(self_id, self.apply_offset(pivot_id, -(2**(updates_so_far -1))), next_id)) or # ya habiamos pasado por ahi actualizando
                     self.gap(gap_beginning, next_id) > request.interval_gap): # no hay posibilidad de que next[i] apunte al intervalo (pivot, new_node]
                     break
                 update_finger_table_forward_thread = Thread(target=self.chord_client.update_finger_table_forward, args=(node_ref, info), daemon=True)
@@ -580,7 +585,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         if self.prev:
             pivot_id = self.prev.id
             interval_gap = self.gap(pivot_id, entrance_node_reference.id)
-            info = communication_messages.UpdateFingerTableRequest(node_reference=communication_messages.ChordNodeReference(id=entrance_node_reference.id, ip=entrance_node_reference.ip, port=entrance_node_reference.port),
+            info = communication_messages.UpdateFingerTableRequest(node_reference=entrance_node_reference.grpc_format,
                                                                         updates_so_far=0, remaining_updates=self.nodes_count, interval_gap=interval_gap)
             # HACK No se si con esto sera suficiente o correcto
             self.chord_client.update_finger_table(node_reference=self.prev, info=info)
