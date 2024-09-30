@@ -158,19 +158,19 @@ class ChordClient:
 # Entrada de un nodo a la red
 # ----------------------------------
     def node_entrance_request(self, node_reference, info):
-        print(f"solicitud a {node_reference.ip}:{node_reference.port} de node_entrance_request")
+        print(f"📡 solicitud a {node_reference.ip}:{node_reference.port} de node_entrance_request")
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
             print("hi")
             return stub.node_entrance_request(info)
 
     def i_am_your_next(self, node_reference, info): 
-        print(f"solicitud a {node_reference.ip}:{node_reference.port} de i_am_your_next")
+        print(f"📡 solicitud a {node_reference.ip}:{node_reference.port} de i_am_your_next")
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
             return stub.i_am_your_next(info)
     def update_next(self, node_reference, info):
-        print(f"solicitud a {node_reference.ip}:{node_reference.port} de update_next")
+        print(f"📡 solicitud a {node_reference.ip}:{node_reference.port} de update_next")
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
             return stub.update_next(info)
@@ -195,15 +195,17 @@ class ChordClient:
 # Actualizar finger tables
 # ----------------------------------
     def update_finger_table(self, node_reference:ChordNodeReference, info): 
-        print(f"solicitud a {node_reference.ip}:{node_reference.port} de update_finger_table")
+        print(f"📡 solicitud a {node_reference.ip}:{node_reference.port} de update_finger_table")
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
             return stub.update_finger_table(info)
     def update_finger_table_forward(self, node_reference, info): 
+        print(f"📡 solicitud a {node_reference.ip}:{node_reference.port} de update_finger_table_forward")
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
             return stub.update_finger_table_forward(info)
     def send_me_your_next_list(self, node_reference):
+        print(f"📡 solicitud a {node_reference.ip}:{node_reference.port} de send_me_your_next_list")
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
             return stub.send_me_your_next_list(communication_messages.Empty())
