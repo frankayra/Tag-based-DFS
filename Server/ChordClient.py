@@ -36,26 +36,30 @@ class ChordClient:
 # Operaciones fundamentales de comunicacion
 # ----------------------------------
     def succesor(self, requesting_node:ChordNodeReference, node_reference:ChordNodeReference, searching_id, requested_operation, operation_id): 
+        print(f"📡 solicitud a {node_reference.ip}:{node_reference.port} de succesor")
         address = node_reference.uri_address
         with grpc.insecure_channel(address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
             request_message = communication_messages.RingOperationRequest(requesting_node=requesting_node.grpc_format, searching_id=searching_id, requested_operation=requested_operation, operation_id=operation_id)
-            try:
-                response = stub.succesor(request_message)
-                return response.success
-            except Exception as e:
-                print(f"Error controlado en ChordClient: {e}")
-                return None
-    def proceed_with_operation(self, self_node_reference, requesting_node_reference:ChordNodeReference, searching_id, requested_operation, operation_id):
+            # try:
+            response = stub.succesor(request_message)
+            return response.success
+            # except Exception as e:
+            #     print(f"Error controlado en ChordClient: {e}")
+            #     return None
+    def proceed_with_operation(self, self_node_reference:ChordNodeReference, requesting_node_reference:ChordNodeReference, searching_id, requested_operation, operation_id):
+        print(f"📡 solicitud a {requesting_node_reference.ip}:{requesting_node_reference.port} de proceed_with_operation.")
         # if node_reference == self.node_reference:               Esto no deberia ocurrir ya que sera chequeado en metodos antes de llamar a este, en ClientAPIServer.
         with grpc.insecure_channel(requesting_node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
-            request_message = communication_messages.OperationDescription(requested_operation=requested_operation, node_reference=self_node_reference, id_founded=searching_id, operation_id=operation_id)
+            request_message = communication_messages.OperationDescription(requested_operation=requested_operation, node_reference=self_node_reference.grpc_format, id_founded=searching_id, operation_id=operation_id)
             response = stub.proceed_with_operation(request_message)
             if not response.success:
                 print("Se hizo una solicitud de operacion al servidor pero este no tenia operaciones pendientes")
     def RetakePendingOperation(self, node_reference, operation, info):
         """Se realiza esta operacion luego de que el servidor reciba una solicitud 'proceed_with_operation'. """
+        print(f"📡 retomando operacion... Envio de la operacion {operation} a {node_reference.ip}:{node_reference.port}.")
+
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
             match operation:

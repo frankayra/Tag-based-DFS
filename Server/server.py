@@ -119,6 +119,12 @@ if __name__ == '__main__':
             print("proximos: ", [f"{n.id}--> {n.ip}:{n.port} " for n in api_server.chord_server.next])
             if api_server.chord_server.prev:
                 print("anterior: ", f"{api_server.chord_server.prev.id}--> {api_server.chord_server.prev.ip}:{api_server.chord_server.prev.port}")
+            print("Finger Table: ")
+            for n in api_server.chord_server.finger_table:
+                print(f"  | ({n.id})")
+            # print("   ⊢−-------------") # ◟∟−∸⊢⨽⫠_
+            print("   ◟ _______________") # ◟∟−∸⊢⨽⫠_
+
             time.sleep(20)  # Mantener el hilo principal activo
     except KeyboardInterrupt:
         print("Interrupción recibida. Saliendo del programa.")

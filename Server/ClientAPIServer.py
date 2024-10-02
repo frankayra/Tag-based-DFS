@@ -51,10 +51,13 @@ class ClientAPIServer(communication.ClientAPIServicer):
 
     def check_for_ready_operation(self, id):
         result = None
+        start_time = time.time()
+        waiting_time = 3
         while(True):
             time.sleep(0.05)
             result = self.chord_server.ready_operations.get(id, None)
             if result: return
+            if time.time() - start_time > waiting_time: return
     
 
         
