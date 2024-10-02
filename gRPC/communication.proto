@@ -53,7 +53,7 @@ service ChordNetworkCommunication{
     rpc succesor (RingOperationRequest) returns (OperationReceived);
     rpc proceed_with_operation (OperationDescription) returns (OperationReceived);
 
-    rpc list (TagList) returns (stream FileGeneralInfo);
+    rpc list (TagList) returns (FileGeneralInfoss);
     rpc file_content (FileLocation) returns (FileContent);
     rpc add_files (FilesToAddWithLocation) returns (OperationResult);
     rpc add_tags (TagQuery) returns (OperationResult);
@@ -90,6 +90,10 @@ service ChordNetworkCommunication{
     rpc send_me_your_next_list (Empty) returns (ChordNodeReferences);
 }
 message Empty {}
+
+message FileGeneralInfoss {
+    repeated FileGeneralInfo files_general_info = 1;
+}
 
 enum Operation {
     ADD_FILES = 0;

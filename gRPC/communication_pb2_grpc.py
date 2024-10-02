@@ -333,10 +333,10 @@ class ChordNetworkCommunicationStub(object):
                 request_serializer=communication__pb2.OperationDescription.SerializeToString,
                 response_deserializer=communication__pb2.OperationReceived.FromString,
                 _registered_method=True)
-        self.list = channel.unary_stream(
+        self.list = channel.unary_unary(
                 '/TagBasedFileSystem.ChordNetworkCommunication/list',
                 request_serializer=communication__pb2.TagList.SerializeToString,
-                response_deserializer=communication__pb2.FileGeneralInfo.FromString,
+                response_deserializer=communication__pb2.FileGeneralInfoss.FromString,
                 _registered_method=True)
         self.file_content = channel.unary_unary(
                 '/TagBasedFileSystem.ChordNetworkCommunication/file_content',
@@ -445,7 +445,7 @@ class ChordNetworkCommunicationStub(object):
                 _registered_method=True)
         self.update_replication_clique = channel.unary_unary(
                 '/TagBasedFileSystem.ChordNetworkCommunication/update_replication_clique',
-                request_serializer=communication__pb2.ChordNodeReferences.SerializeToString,
+                request_serializer=communication__pb2.UpdateReplicationCliqueRequest.SerializeToString,
                 response_deserializer=communication__pb2.OperationResult.FromString,
                 _registered_method=True)
         self.i_am_your_prev = channel.unary_unary(
@@ -644,8 +644,7 @@ class ChordNetworkCommunicationServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def send_me_your_next_list(self, request, context):
-        """rpc replication_received (ChordNodeReference) returns (OperationReceived);
-        """
+        """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
@@ -663,10 +662,10 @@ def add_ChordNetworkCommunicationServicer_to_server(servicer, server):
                     request_deserializer=communication__pb2.OperationDescription.FromString,
                     response_serializer=communication__pb2.OperationReceived.SerializeToString,
             ),
-            'list': grpc.unary_stream_rpc_method_handler(
+            'list': grpc.unary_unary_rpc_method_handler(
                     servicer.list,
                     request_deserializer=communication__pb2.TagList.FromString,
-                    response_serializer=communication__pb2.FileGeneralInfo.SerializeToString,
+                    response_serializer=communication__pb2.FileGeneralInfoss.SerializeToString,
             ),
             'file_content': grpc.unary_unary_rpc_method_handler(
                     servicer.file_content,
@@ -775,7 +774,7 @@ def add_ChordNetworkCommunicationServicer_to_server(servicer, server):
             ),
             'update_replication_clique': grpc.unary_unary_rpc_method_handler(
                     servicer.update_replication_clique,
-                    request_deserializer=communication__pb2.ChordNodeReferences.FromString,
+                    request_deserializer=communication__pb2.UpdateReplicationCliqueRequest.FromString,
                     response_serializer=communication__pb2.OperationResult.SerializeToString,
             ),
             'i_am_your_prev': grpc.unary_unary_rpc_method_handler(
@@ -876,12 +875,12 @@ class ChordNetworkCommunication(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_stream(
+        return grpc.experimental.unary_unary(
             request,
             target,
             '/TagBasedFileSystem.ChordNetworkCommunication/list',
             communication__pb2.TagList.SerializeToString,
-            communication__pb2.FileGeneralInfo.FromString,
+            communication__pb2.FileGeneralInfoss.FromString,
             options,
             channel_credentials,
             insecure,
@@ -1474,7 +1473,7 @@ class ChordNetworkCommunication(object):
             request,
             target,
             '/TagBasedFileSystem.ChordNetworkCommunication/update_replication_clique',
-            communication__pb2.ChordNodeReferences.SerializeToString,
+            communication__pb2.UpdateReplicationCliqueRequest.SerializeToString,
             communication__pb2.OperationResult.FromString,
             options,
             channel_credentials,

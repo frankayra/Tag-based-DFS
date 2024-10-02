@@ -1,4 +1,5 @@
 from threading import Thread, Event
+import threading
 import time
 import re
 import platform
@@ -14,6 +15,9 @@ import docker
 from ChordServer import ChordServer
 from ChordClient import ChordClient, ChordNodeReference
 from ClientAPIServer import ClientAPIServer
+
+
+
 
 
 if __name__ == '__main__':
@@ -123,8 +127,8 @@ if __name__ == '__main__':
             for n in api_server.chord_server.finger_table:
                 print(f"  | ({n.id})")
             # print("   ⊢−-------------") # ◟∟−∸⊢⨽⫠_
-            print("   ◟ _______________") # ◟∟−∸⊢⨽⫠_
-
+            print(f"   ◟ _______________ Hilos: {threading.active_count()}") # ◟∟−∸⊢⨽⫠_
+            print(f"Hilos activos: {threading.active_count()}")
             time.sleep(20)  # Mantener el hilo principal activo
     except KeyboardInterrupt:
         print("Interrupción recibida. Saliendo del programa.")
@@ -176,3 +180,5 @@ if __name__ == '__main__':
 #     except docker.errors.NotFound:
 #         print(f"La red '{network_name}' no existe.")
 #         return []
+
+

@@ -2,8 +2,10 @@ import time
 import random
 from hashlib import sha1
 import socket
+from concurrent.futures import ThreadPoolExecutor
 from concurrent import futures
 from threading import Thread
+import threading
 import os
 import platform
 
@@ -17,11 +19,13 @@ from gRPC import communication_pb2_grpc as communication
 from DB import File_Tag_DB, Files_References_DB
 from ChordClient import ChordClient
 from ChordClient import ChordNodeReference
+from controlled_thread import ControlledThread
+
+
 
 
 class ChordServer(communication.ChordNetworkCommunicationServicer):
     def __init__(self, check_for_updates_func, ip: str, port:int = 50052, nodes_count:int = 3, replication_factor = 3, next_alive_check_length = 3, server_to_request_entrance:ChordNodeReference = None):
-        
         self.next:list[ChordNodeReference] = []
         self.prev:ChordNodeReference = None
         self.finger_table:list[ChordNodeReference] = []
@@ -50,8 +54,9 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         if server_to_request_entrance:
             print(f"reclamando el id: {claiming_id}")
             info = communication_messages.NodeEntranceRequest(new_node_reference=self.node_reference.grpc_format, claiming_id=claiming_id)
-            entrance_request_thread = Thread(target=self.chord_client.node_entrance_request, args=(server_to_request_entrance, info), daemon=True)
-            entrance_request_thread.start()
+            # entrance_request_thread = Thread(target=self.chord_client.node_entrance_request, args=(server_to_request_entrance, info), daemon=True)
+            # entrance_request_thread.start()
+            ControlledThread(self.chord_client.node_entrance_request, (server_to_request_entrance, info))
             while self.node_reference.id == -1:
                 print("Esperando por respuesta para entrada a la red...")
                 time.sleep(1)
@@ -64,7 +69,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         else: self.node_reference.id = claiming_id
 
     def serve(self, port=50052):                                                                                    # ✅
-        server = grpc.server(futures.ThreadPoolExecutor(max_workers=5))
+        server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
         communication.add_ChordNetworkCommunicationServicer_to_server(self, server)
         server.add_insecure_port("[::]:" + str(port))
         server.start()
@@ -86,24 +91,21 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         # no concurrente ni paralelo para meter el resltado en la bandeja de salida y asi ClientAPIServer 
         # lo toma y se lo envia al cliente.
         # ⛔⛔⛔ print(f"Se va a enviar la siguiente estructura al otro servidor(info): {info}")
-        results = self.chord_client.RetakePendingOperation(node_reference, operation, info)
-        if operation == communication_messages.LIST:
-            self.ready_operations[operation_id] = []
-            try:
-                for item in results:
-                    self.ready_operations[operation_id].append(item)
-                # print(f"operation id: {operation_id}")
-            except Exception as e:
-                print(f"results: {results}")
-                print(f"el error que esta dando es: {e}")
-                return
-        # if operation == communication_messages.LIST:
-        #     self.ready_operations[operation_id] = [item for item in results]
-        # else:
-        #     self.ready_operations[operation_id] = results
+        print(f"Threads activos: {threading.active_count()}")
+        print(f"Se va a enviar la siguiente estructura al otro servidor(info): {info}")
+        
+        # try:
+        #     active_threads = threading.active_count()
+        #     print(f"Hilos activos: {active_threads}")
+        #     while active_threads >=9:
+        #         time.sleep(0.1)
+        #     print(f"info: {info}")
+        # except Exception as e:
+        #     print(e)
 
-        # HACK Esto no se si hay que iterarlo y devolverlo o se puede devolver asi mismo sin iterar
+        results = self.chord_client.RetakePendingOperation(node_reference, operation, info)
         self.ready_operations[operation_id] = results
+        print(f"pase el envio y estoy en RetakePendingOperation de nuevo: {results}")
     def PushPendingOperation(self, operation_id, operation, info, function_to_apply_to_results = print):            # ✅
         print("🔗 Entre en push_pending_operation")
 
@@ -231,43 +233,35 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         recovered_files = self.db_physical_files.RecoveryFilesInfo_ByTagQuery(tag_query, include_tags=True)
         recovered_files_references = self.db_references.RecoveryFilesInfo_ByTagQuery(tag_query, include_tags=True)
 
-        for file in recovered_files:
-            files_list.append(file)
-        for file in recovered_files_references:
-            files_list.append(file)
-
         empty_file_list = True
-        print(f"archivos recuperados: {files_list}")
-        for file in files_list:
+        for file in recovered_files:
             empty_file_list = False
             file_name = file[0]
             file_hash = file[1]
             file_location_hash = file[2]
             file_tags = file[3]
-            print(f"nombre: {file_name}")
-            print(f"hash: {file_hash}")
-            print(f"location: {file_location_hash}")
-            print(f"tags: {file_tags}")
-            # time.sleep(1)
-            yield communication_messages.FileGeneralInfo(title=file_name,
+            file = communication_messages.FileGeneralInfo(title=file_name,
                                                             tag_list=file_tags,
                                                             location=communication_messages.FileLocation(file_hash=file_hash, 
                                                                                                             location_hash=file_location_hash))
+            files_list.append(file)
+        for file in recovered_files_references:
+            empty_file_list = False
+            file_name = file[0]
+            file_hash = file[1]
+            file_location_hash = file[2]
+            file_tags = file[3]
+            file = communication_messages.FileGeneralInfo(title=file_name,
+                                                            tag_list=file_tags,
+                                                            location=communication_messages.FileLocation(file_hash=file_hash, 
+                                                                                                            location_hash=file_location_hash))
+            files_list.append(file)
+
+        print(f"archivos recuperados: {recovered_files} || {recovered_files_references}")
         if empty_file_list:
             print("No se encontraron archivos")
-            yield communication_messages.FileGeneralInfo(title="file_name not found",
-                                                            tag_list=[],
-                                                            location=communication_messages.FileLocation(file_hash='-1', 
-                                                                                                            location_hash=-1))
-        return
-        ##### DEBUG #####
-        print("\n-------- DEBUG MODE INFO--------")
-        File, FileTag, Tag = self.db_physical_files.File, self.db_physical_files.FileTag, self.db_physical_files.Tag
-        all_files = File.select(File.location_hash, File.name, File.file_hash)
-        for file in all_files:
-            print(f"file Hash: {file.file_hash}\n   |--> name: {file.name}\n   |--> location: {file.location_hash}\n   |--> tags: {[tag.tag.name for tag in file.tags]}\n")
-        # self.db_physical_files.File.delete().execute()
-        # self.db_physical_files.FileTag.delete().execute()
+            return communication_messages.FileGeneralInfoss(files_general_info=[])
+        return communication_messages.FileGeneralInfoss(files_general_info=files_list)
     def file_content(self, request, context):                                                                       # ✅
         """FileLocation {file_hash:int, location_hash:int}    =>    FileContent {title:string, content:string}"""
         print("🔹 Entre en file_content")

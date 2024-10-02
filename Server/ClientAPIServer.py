@@ -42,7 +42,7 @@ class ClientAPIServer(communication.ClientAPIServicer):
     
 
     def serve(self):
-        server = grpc.server(futures.ThreadPoolExecutor(max_workers=5))
+        server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
         communication.add_ClientAPIServicer_to_server(self, server)
         server.add_insecure_port("[::]:" + str(self.port))
         server.start()
@@ -55,6 +55,7 @@ class ClientAPIServer(communication.ClientAPIServicer):
         waiting_time = 3
         while(True):
             time.sleep(0.05)
+            print("Esperando resultados....")
             result = self.chord_server.ready_operations.get(id, None)
             if result: return
             if time.time() - start_time > waiting_time: return
@@ -66,15 +67,13 @@ class ClientAPIServer(communication.ClientAPIServicer):
         self.pending_operations[operation_id] = (operation, info)
         # result = self.chord_client.list(tag_query=[tag for tag in request.tags])
         print(f"operation id: {operation_id}")
-        checking_for_results_thread = Thread(target=self.check_for_ready_operation, args=(operation_id,))
+        # checking_for_results_thread = Thread(target=self.check_for_ready_operation, args=(operation_id,))
         def wait_for_results():
-            checking_for_results_thread.start()
-            self.active_threads += 1
-            if self.active_threads > 1: print(f"active threads: {self.active_threads}")
-            
-            checking_for_results_thread.join()
-            self.active_threads -= 1
-            
+            print("invocamos el metodo de espera......")
+            # checking_for_results_thread.start()
+            # checking_for_results_thread.join()
+            self.check_for_ready_operation(operation_id)
+            print(f"aqui los resultados se pueden ver desde ClientAPI{self.ready_operations[operation_id]}")
             result = self.ready_operations[operation_id]
             del self.ready_operations[operation_id]
             print(f"result a la hora de chequear: {result}")
@@ -104,7 +103,7 @@ class ClientAPIServer(communication.ClientAPIServicer):
             tag_id = int(sha1(tag.encode("utf-8")).hexdigest(), 16) % (2**self.chord_server.nodes_count)
             if self.belonging_id(tag_id):
                 results = self.chord_server.list(request, context)
-                for file in results:
+                for file in results.files_general_info:
                     yield file
                 return
             
@@ -120,14 +119,14 @@ class ClientAPIServer(communication.ClientAPIServicer):
         self.chord_server.succesor(info, context)
         results = wait_for_results()
         
-        if isinstance(results, Exception):
+        if len(results.files_general_info) == 0:
             yield communication_messages.FileGeneralInfo(title=results.message,
                                                             tag_list=[],
                                                             location=communication_messages.FileLocation(file_hash='-1', 
                                                                                                             location_hash=-1))
             return
 
-        for item in results:
+        for item in results.files_general_info:
             yield item        
         
     def fileContent(self, request, context):

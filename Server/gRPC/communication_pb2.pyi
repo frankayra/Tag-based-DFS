@@ -103,6 +103,12 @@ class Empty(_message.Message):
     __slots__ = ()
     def __init__(self) -> None: ...
 
+class FileGeneralInfoss(_message.Message):
+    __slots__ = ("files_general_info",)
+    FILES_GENERAL_INFO_FIELD_NUMBER: _ClassVar[int]
+    files_general_info: _containers.RepeatedCompositeFieldContainer[FileGeneralInfo]
+    def __init__(self, files_general_info: _Optional[_Iterable[_Union[FileGeneralInfo, _Mapping]]] = ...) -> None: ...
+
 class ServerID(_message.Message):
     __slots__ = ("serverID",)
     SERVERID_FIELD_NUMBER: _ClassVar[int]
@@ -272,6 +278,16 @@ class FilesAllotmentTransferRequest(_message.Message):
     FILES_FIELD_NUMBER: _ClassVar[int]
     files: _containers.RepeatedCompositeFieldContainer[FileToTransfer]
     def __init__(self, files: _Optional[_Iterable[_Union[FileToTransfer, _Mapping]]] = ...) -> None: ...
+
+class UpdateReplicationCliqueRequest(_message.Message):
+    __slots__ = ("clique", "new_leader", "old_leader")
+    CLIQUE_FIELD_NUMBER: _ClassVar[int]
+    NEW_LEADER_FIELD_NUMBER: _ClassVar[int]
+    OLD_LEADER_FIELD_NUMBER: _ClassVar[int]
+    clique: ChordNodeReferences
+    new_leader: ChordNodeReference
+    old_leader: ChordNodeReference
+    def __init__(self, clique: _Optional[_Union[ChordNodeReferences, _Mapping]] = ..., new_leader: _Optional[_Union[ChordNodeReference, _Mapping]] = ..., old_leader: _Optional[_Union[ChordNodeReference, _Mapping]] = ...) -> None: ...
 
 class UpdateFingerTableRequest(_message.Message):
     __slots__ = ("node_reference", "updates_so_far", "remaining_updates", "interval_gap")
