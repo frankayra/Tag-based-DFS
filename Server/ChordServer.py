@@ -85,17 +85,17 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         # Al recibir la respuesta se sigue el proceso no como cualquier otro metodo iterativo
         # no concurrente ni paralelo para meter el resltado en la bandeja de salida y asi ClientAPIServer 
         # lo toma y se lo envia al cliente.
+        print(f"Se va a enviar la siguiente estructura al otro servidor(info): {info}")
         results = self.chord_client.RetakePendingOperation(node_reference, operation, info)
         if operation == communication_messages.LIST:
             self.ready_operations[operation_id] = []
             try:
                 for item in results:
                     self.ready_operations[operation_id].append(item)
-                print(f"results: {results}")
                 # print(f"operation id: {operation_id}")
             except Exception as e:
                 print(f"results: {results}")
-
+                print(f"el error que esta dando es: {e}")
                 return
         # if operation == communication_messages.LIST:
         #     self.ready_operations[operation_id] = [item for item in results]
@@ -237,13 +237,17 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
             files_list.append(file)
 
         empty_file_list = True
+        print(f"archivos recuperados: {files_list}")
         for file in files_list:
-            print(f"Archivo recuperado: {file}")
             empty_file_list = False
             file_name = file[0]
             file_hash = file[1]
             file_location_hash = file[2]
             file_tags = file[3]
+            print(f"nombre: {file_name}")
+            print(f"hash: {file_hash}")
+            print(f"location: {file_location_hash}")
+            print(f"tags: {file_tags}")
             # time.sleep(1)
             yield communication_messages.FileGeneralInfo(title=file_name,
                                                             tag_list=file_tags,

@@ -66,7 +66,7 @@ class ClientAPIServer(communication.ClientAPIServicer):
         self.pending_operations[operation_id] = (operation, info)
         # result = self.chord_client.list(tag_query=[tag for tag in request.tags])
         print(f"operation id: {operation_id}")
-        checking_for_results_thread = Thread(target=self.check_for_ready_operation, args=(operation_id))
+        checking_for_results_thread = Thread(target=self.check_for_ready_operation, args=(operation_id,))
         def wait_for_results():
             checking_for_results_thread.start()
             self.active_threads += 1
@@ -108,6 +108,7 @@ class ClientAPIServer(communication.ClientAPIServicer):
 
         operation_id = int(sha1(random_selected_tag.encode("utf-8")).hexdigest(), 16) % 1000000                    # TODO verificar que el protocolo envie apropiadamente este id y retorne intacto de la operacion de successor()
         
+        print(f"request del cliente: {request}")
         wait_for_results = self.PushPendingOperation(operation_id=operation_id, operation=communication_messages.LIST, info=request)
         info = communication_messages.RingOperationRequest(requesting_node=self.chord_server.node_reference.grpc_format, searching_id=random_selected_tag_hash, requested_operation=communication_messages.LIST, operation_id=operation_id)
         # self.chord_client.succesor(requesting_node=self.chord_server.node_reference, node_reference=self.chord_server.node_reference, searching_id=random_selected_tag_hash, requested_operation=communication_messages.LIST, operation_id= operation_id)
