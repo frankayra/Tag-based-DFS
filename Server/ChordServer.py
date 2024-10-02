@@ -85,7 +85,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         # Al recibir la respuesta se sigue el proceso no como cualquier otro metodo iterativo
         # no concurrente ni paralelo para meter el resltado en la bandeja de salida y asi ClientAPIServer 
         # lo toma y se lo envia al cliente.
-        print(f"Se va a enviar la siguiente estructura al otro servidor(info): {info}")
+        # ⛔⛔⛔ print(f"Se va a enviar la siguiente estructura al otro servidor(info): {info}")
         results = self.chord_client.RetakePendingOperation(node_reference, operation, info)
         if operation == communication_messages.LIST:
             self.ready_operations[operation_id] = []

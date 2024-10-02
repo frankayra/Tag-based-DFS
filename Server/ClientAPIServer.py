@@ -82,14 +82,19 @@ class ClientAPIServer(communication.ClientAPIServicer):
         return wait_for_results
         
         
-    def belonging_id(self, searching_id):
+    def belonging_id(self, searching_id):                                                                           # ✅
         if not self.chord_server.prev:
+            print("El id pertenece, porque no tengo a mas nadie en el anillo")
             return True
         self_id = self.chord_server.node_reference.id
         prev_id = self.chord_server.prev.id
-        # return searching_id <= self_id and (prev_id < searching or prev_id > self_id)
-        return (prev_id < searching_id <= self_id) or (self_id < prev_id and (searching_id > prev_id or searching_id <= self_id))
+        # prev_id  <   searching_id   <=   self_id
+        # return searching_id <= self_id and (prev_id < searching_id or prev_id > self_id)        # BUG Esto da un falso negativo en el caso de que este self_id con un id de los primeros y prev_id con uno de los ultimos, y caiga searching_id entre los dos pero del lado de prev_id, de los mayores ids.
+        response = (prev_id < searching_id <= self_id) or (self_id < prev_id and (searching_id > prev_id or searching_id <= self_id))
         
+        if response:    print(f"El id {searching_id} ((SI))esta en [{self.chord_server.prev.id}, {self.chord_server.node_reference.id}]")
+        else:           print(f"El id {searching_id} ((NO)) esta en [{self.chord_server.prev.id}, {self.chord_server.node_reference.id}]")
+        return response
     
     def list(self, request, context):
         """TagList {tags: string[]}    =>    FileGeneralInfo {title: string, tag_list: strin[], location: FileLocation {file_hash:int, location_hash: int}}"""
@@ -133,10 +138,12 @@ class ClientAPIServer(communication.ClientAPIServicer):
             return self.chord_server.file_content(request, context)
 
         file_hash = request.file_hash
-        operation_id = int(sha1(file_hash.encode("utf-8")).hexdigest(), 16)
+        operation_id = int(sha1(file_hash.encode("utf-8")).hexdigest(), 16) % 1000000
 
         wait_for_results = self.PushPendingOperation(operation_id=operation_id, operation=communication_messages.FILE_CONTENT, info=request)
-        self.chord_client.succesor(node_reference=self.chord_server.node_reference, searching_id=file_location_hash, requested_operation=communication_messages.FILE_CONTENT, operation_id=operation_id)
+        info = communication_messages.RingOperationRequest(requesting_node=self.chord_server.node_reference.grpc_format, searching_id=file_location_hash, requested_operation=communication_messages.FILE_CONTENT, operation_id=operation_id)
+        self.chord_server.succesor(info, context)
+        # self.chord_client.succesor(node_reference=self.chord_server.node_reference, searching_id=file_location_hash, requested_operation=communication_messages.FILE_CONTENT, operation_id=operation_id)
         results = wait_for_results()
 
         if isinstance(results, Exception):
