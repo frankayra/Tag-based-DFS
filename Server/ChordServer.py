@@ -10,7 +10,7 @@ import os
 import platform
 
 
-import logging
+import docker
 import grpc
 
 
@@ -25,7 +25,7 @@ from controlled_thread import ControlledThread
 
 
 class ChordServer(communication.ChordNetworkCommunicationServicer):
-    def __init__(self, check_for_updates_func, ip: str, port:int = 50052, nodes_count:int = 3, replication_factor = 3, next_alive_check_length = 3, server_to_request_entrance:ChordNodeReference = None):
+    def __init__(self, check_for_updates_func, ip: str, port:int = 50052, nodes_count:int = 3, replication_factor = 3, next_alive_check_length = 3, docker_network_name = 'ds_network', server_to_request_entrance:ChordNodeReference = None):
         self.next:list[ChordNodeReference] = []
         self.prev:ChordNodeReference = None
         self.finger_table:list[ChordNodeReference] = []
@@ -50,8 +50,8 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         ControlledThread(target=self.serve, args=(port,))
         claiming_id = random.randint(0, (2**nodes_count)-1)
         # claiming_id = 2
+        print(f"reclamando el id: {claiming_id}")
         if server_to_request_entrance:
-            print(f"reclamando el id: {claiming_id}")
             info = communication_messages.NodeEntranceRequest(new_node_reference=self.node_reference.grpc_format, claiming_id=claiming_id)
             # entrance_request_thread = Thread(target=self.chord_client.node_entrance_request, args=(server_to_request_entrance, info), daemon=True)
             # entrance_request_thread.start()
@@ -64,8 +64,38 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
                 #     os.system('cls')
                 # else:
                 #     os.system('clear')
-            print(f"id conseguido: {self.node_reference.id}")
-        else: self.node_reference.id = claiming_id
+            print(f" > id conseguido: {self.node_reference.id} ✅")
+        else: 
+            nodes_ips = self.discover_nodes(network_name=docker_network_name)
+            if len(nodes_ips) == 0:
+                print(f" > No se encontraron nodos en la red: Auto-asignando id: {claiming_id}")
+                self.node_reference.id = claiming_id
+            else:
+                for n_ip in nodes_ips: print(f"Nodo descubierto: {n_ip}")
+                info = communication_messages.NodeEntranceRequest(new_node_reference=self.node_reference.grpc_format, claiming_id=claiming_id)
+                catched = False
+                for n_ip in nodes_ips:
+                    server_to_request_entrance = ChordNodeReference(ip=n_ip, port=50052, id=-1)
+                    try:
+                        self.chord_client.node_entrance_request(server_to_request_entrance, info)
+                        starting_time = time.time()
+                        while True:
+                            print("Esperando por respuesta para entrada a la red...")
+                            if self.node_reference.id != -1:
+                                catched = True
+                                break
+                            time.sleep(1)
+                            if time.time() - starting_time > 4:
+                                break
+                        if catched: 
+                            print(f" > id conseguido: {self.node_reference.id} ✅")
+                            break
+                    except:
+                        continue
+                if not catched:
+                    self.node_reference.id = claiming_id
+                    print(f" > Ninguno de los nodos descubiertos respondio validamente: Auto-asignando id: {claiming_id}")
+                        
 
     def serve(self, port=50052):                                                                                    # ✅
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
@@ -74,7 +104,17 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         server.start()
         print("Chord Server iniciado, escuchando en el puerto " + str(port))
         server.wait_for_termination()
+    def discover_nodes(self, network_name='ds_network'):
+        client = docker.from_env()
+        network = client.networks.get(network_name)
+        containers = network.attrs['Containers']
 
+        nodes = []
+        for container_id, container_info in containers.items():
+            container_ip = container_info['IPv4Address'].split('/')[0]  # Obtener solo la IP
+            nodes.append(container_ip)
+
+        return nodes
     def RetakePendingOperation(self, node_reference, operation, operation_id):                                      # ✅
         print("🔗 Entre en RetakePendingOperation")
 
