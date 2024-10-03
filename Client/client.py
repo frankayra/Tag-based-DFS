@@ -30,24 +30,24 @@ async def actions(action: str, arg1_list, arg2_list):
                     with open(file_name, 'rb') as file:
                         file_content = file.read()
                         files.append(communication_messages.FileContent(title=file_name, content=file_content))
-                response = stub.addFiles(communication_messages.FilesToAdd(files=files, tags=arg2_list))
+                response = stub.addFiles(communication_messages.FilesToAdd(files=files, tags=arg2_list), timeout=2)
                 return f'response.success: {response.success}\nresponse.message: {response.message}'
             case 'add-tags':
-                response = stub.addTags(communication_messages.TagQuery(tags_query=arg1_list, operation_tags=arg2_list))
+                response = stub.addTags(communication_messages.TagQuery(tags_query=arg1_list, operation_tags=arg2_list), timeout=2)
                 return f'response.success: {response.success}\nresponse.message: {response.message}'
             case 'delete':
-                response = stub.delete(communication_messages.TagList(tags=arg1_list))
+                response = stub.delete(communication_messages.TagList(tags=arg1_list), timeout=2)
 
                 return f'response.success: {response.success}\nresponse.message: {response.message}'
             case 'delete-tags':
-                response = stub.deleteTags(communication_messages.TagQuery(tags_query=arg1_list, operation_tags=arg2_list))
+                response = stub.deleteTags(communication_messages.TagQuery(tags_query=arg1_list, operation_tags=arg2_list), timeout=2)
                 return f'response.success: {response.success}\nresponse.message: {response.message}'
 
                
                 
             case 'list':
                 print("Listing...")
-                response = stub.list(communication_messages.TagList(tags=arg1_list))
+                response = stub.list(communication_messages.TagList(tags=arg1_list), timeout=2)
                 result = ""
                 for file_info in response:
                     if file_info.location.file_hash == "-1":
@@ -63,7 +63,7 @@ async def actions(action: str, arg1_list, arg2_list):
                 if not file_name:
                     return "No se ha recuperado tal archivo, para acceder a el tene que haber sido recuperado en esta sesion"
 
-                response = stub.fileContent(communication_messages.FileLocation(file_hash=arg1_list[0], location_hash=location_hash))
+                response = stub.fileContent(communication_messages.FileLocation(file_hash=arg1_list[0], location_hash=location_hash), timeout=2)
                 if not response.title and not response.content:
                     return f"\nNo se encontro el archivo especificado('{file_name}'), este fue movido o eliminado de la BD."
                 return f"\n   📰: \"{response.title}\" \n{response.content}"

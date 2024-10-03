@@ -1,7 +1,5 @@
 syntax = "proto3";
 
-// option python_package = "my_grpc_package";
-// option python_multiple_files = true;
 option java_multiple_files = true;
 option java_package = "io.grpc.examples.helloworld";
 option java_outer_classname = "HelloWorldProto";
@@ -17,12 +15,6 @@ service ClientAPI {
     rpc delete (TagList) returns (OperationResult);
     rpc deleteTags (TagQuery) returns (OperationResult);
 }
-// service CRUD {
-
-// }
-// service Stabilization{
-    
-// }
 
 message TagList{
     repeated string tags = 1;
@@ -53,4 +45,173 @@ message FileGeneralInfo{
     string title = 1;
     FileLocation location = 2;
     repeated string tag_list = 3;
+}
+
+//////////////////////////////////////////////////////////////// Chord 
+
+service ChordNetworkCommunication{
+    rpc succesor (RingOperationRequest) returns (OperationReceived);
+    rpc proceed_with_operation (OperationDescription) returns (OperationReceived);
+
+    rpc list (TagList) returns (FileGeneralInfoss);
+    rpc file_content (FileLocation) returns (FileContent);
+    rpc add_files (FilesToAddWithLocation) returns (OperationResult);
+    rpc add_tags (TagQuery) returns (OperationResult);
+    rpc delete (TagList) returns (OperationResult);
+    rpc delete_tags (TagQuery) returns (OperationResult);
+
+    rpc replicate (FilesToReplicate) returns (OperationResult);
+    rpc send_raw_database_replica (RawDatabases) returns (OperationResult);
+    
+    rpc add_references (FilesReferencesToAdd) returns (OperationResult);
+    rpc delete_files_replicas (FilesToUpdateRquest) returns (OperationResult);
+    rpc delete_files_references (FilesToUpdateRquest) returns (OperationResult);
+
+    rpc add_tags_to_refered_files (UpdateTagsRequest) returns (OperationResult);
+    rpc add_tags_to_replicated_files (UpdateTagsRequest) returns (OperationResult);
+    rpc delete_tags_from_refered_files (UpdateTagsRequest) returns (OperationResult);
+    rpc delete_tags_from_replicated_files (UpdateTagsRequest) returns (OperationResult);
+
+    
+    rpc heartbeat (Empty) returns (Empty);
+    rpc alive_request (Empty) returns (LiveAnswer);
+    rpc unreplicate (ChordNodeReference) returns (OperationResult);
+    
+    rpc node_entrance_request (NodeEntranceRequest) returns (OperationResult);
+    rpc i_am_your_next (IAmYourNextRequest) returns (OperationReceived);
+    rpc update_next (ChordNodeReference) returns (OperationReceived);
+    rpc files_allotment_transfer (FilesAllotmentTransferRequest) returns (OperationResult);
+    rpc update_replication_clique (UpdateReplicationCliqueRequest) returns (OperationResult);
+    
+    rpc i_am_your_prev (ChordNodeReference) returns (OperationResult);
+
+    rpc update_finger_table (UpdateFingerTableRequest) returns (OperationReceived);
+    rpc update_finger_table_forward (UpdateFingerTableRequest) returns (OperationReceived);
+    rpc send_me_your_next_list (Empty) returns (ChordNodeReferences);
+}
+message Empty {}
+
+message FileGeneralInfoss {
+    repeated FileGeneralInfo files_general_info = 1;
+}
+
+enum Operation {
+    ADD_FILES = 0;
+    ADD_TAGS = 1;
+    DELETE = 2;
+    DELETE_TAGS = 3;
+    LIST = 4;
+    FILE_CONTENT = 5;
+    SEND_RAW_DATABASE_REPLICA = 6;
+    ADD_REFERENCES = 7;
+    DELETE_FILES_REPLICAS = 8;
+    DELETE_FILES_REFERENCES = 9;
+    ADD_TAGS_TO_REFERED_FILES = 10;
+    ADD_TAGS_TO_REPLICATED_FILES = 11;
+    DELETE_TAGS_FROM_REFERED_FILES = 12;
+    DELETE_TAGS_FROM_REPLICATED_FILES = 13;
+    NODE_ENTRANCE_REQUEST = 14;
+    UPDATE_FINGER_TABLE = 15;
+    UPDATE_FINGER_TABLE_FORWARD = 16;
+}
+message ServerID {
+    int32 serverID = 1;
+}
+message ChordNodeReference {
+    int32 id = 1;
+    string ip = 2;
+    int32 port = 3;
+}
+message RingOperationRequest{
+    ChordNodeReference requesting_node = 1;
+    int32 searching_id = 2;
+    Operation requested_operation = 3;
+    int32 operation_id = 4;
+}
+message OperationDescription {
+    Operation requested_operation = 1;
+    ChordNodeReference node_reference = 2;
+    int32 id_founded = 3;
+    int32 operation_id = 4;
+}
+
+
+message OperationReceived {
+    optional bool success = 1;
+}
+
+message FilesToAddWithLocation {
+    repeated FileContent files = 1;
+    repeated string tags = 2;
+    int32 location_hash = 3;
+}
+message FileReference {
+    string title = 1;
+    int64 file_hash = 2;
+}
+message FilesReferencesToAdd {
+    int32 location_hash = 1;
+    repeated FileReference files_references = 2;
+    repeated string tags = 3;
+}
+message FilesReferences{
+    repeated FileReference files_references = 1;
+}
+message UpdateRequestArguments {
+    optional FilesReferences files = 1;
+    optional TagList tag_list = 2;
+}
+message UpdateTagsRequest {
+    UpdateRequestArguments args = 1; 
+    TagList operation_tags = 2;
+}
+message FilesToReplicate {
+    FilesToAdd files = 1;
+    int32 location_hash = 2;
+    ChordNodeReference main_replica_node_reference = 3;
+    // int32 remaining_replications = 4;
+}
+message RawDatabases {
+    bytes db_phisical = 1;
+    bytes db_references = 2;
+}
+message FilesToUpdateRquest {
+    UpdateRequestArguments args = 1;
+    ChordNodeReference node_reference = 2;
+}
+message ChordNodeReferences {
+    repeated ChordNodeReference references = 1;
+}
+message LiveAnswer {
+    bool any_changes = 1;
+    optional ChordNodeReferences next_nodes_list = 2;
+}
+message NodeEntranceRequest {
+    ChordNodeReference new_node_reference = 1;
+    int32 claiming_id = 2;
+}
+message IAmYourNextRequest {
+    ChordNodeReferences next_list = 1;
+    ChordNodeReference prev = 2;
+    optional int32 assigned_id = 3;
+}
+message FileToTransfer {
+    FileContent file = 1;
+    repeated string tags = 2;
+    FileLocation location = 3;
+}
+message FilesAllotmentTransferRequest {
+    repeated FileToTransfer files = 1;
+}
+message UpdateReplicationCliqueRequest{
+    ChordNodeReferences clique = 1;
+    ChordNodeReference new_leader = 2;
+    ChordNodeReference old_leader = 3;
+}
+message UpdateFingerTableRequest {
+    ChordNodeReference node_reference = 1;
+    optional int32 updates_so_far = 2;
+    optional int32 remaining_updates = 3;
+    optional int32 interval_gap = 4;
+
 }

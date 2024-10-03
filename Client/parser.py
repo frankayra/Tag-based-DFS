@@ -60,13 +60,12 @@ async def RunPrompt(commands: dict):
             "- cache\n" + 
             "- clear-cache")
 
-    while 1:
-        try:
+    try:
+        while 1:
             command = input(">>> ")
-        except EOFError or KeyboardInterrupt:
-            print("Interrupción del usuario")
-            break
-        print(await exec_command(command, commands))
+            print(await exec_command(command, commands))
+    except EOFError or KeyboardInterrupt:
+        print("Interrupción del usuario")
         # try:
         # except Exception as e:
         #     print(f"Error controlado proveniente del parser (desconocido).")
