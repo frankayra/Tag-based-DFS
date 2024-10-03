@@ -15,6 +15,7 @@ from gRPC import communication_pb2_grpc as communication
 from DB import File_Tag_DB, Files_References_DB
 from ChordServer import ChordServer
 from ChordClient import ChordClient, ChordNodeReference
+from controlled_thread import ControlledThread
 
 
 class ClientAPIServer(communication.ClientAPIServicer):
@@ -35,8 +36,7 @@ class ClientAPIServer(communication.ClientAPIServicer):
         self.ready_operations = self.chord_server.ready_operations
         
         self.active_threads = 0
-        serve_thread = Thread(target=self.serve, daemon=True)
-        serve_thread.start()
+        ControlledThread(target=self.serve)
     
 
     
@@ -55,7 +55,7 @@ class ClientAPIServer(communication.ClientAPIServicer):
         waiting_time = 3
         while(True):
             time.sleep(0.05)
-            print("Esperando resultados....")
+            if time.time()-start_time % 2 == 0: print("Esperando resultados....")
             result = self.chord_server.ready_operations.get(id, None)
             if result: return
             if time.time() - start_time > waiting_time: return

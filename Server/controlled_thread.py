@@ -5,11 +5,11 @@ class ControlledThread:
     active_threads = {}
     # active_threads_count = 0
     _being_used = False
-    _max_threads = 9
+    max_threads = 8
     def __init__(self, target, args:tuple = (), name:str=None, wait_time = 3):
         starting_time = time.time()
 
-        while threading.active_count() >= ControlledThread._max_threads or ControlledThread._being_used:
+        while threading.active_count() >= ControlledThread.max_threads or ControlledThread._being_used:
             time.sleep(0.1)
             if time.time() - starting_time > wait_time:
                 print(f"El tiempo de espera para el hilo {name if name else threading.active_count()} sobrepaso lo esperado")
