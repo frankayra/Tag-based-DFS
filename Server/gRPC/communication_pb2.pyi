@@ -198,12 +198,14 @@ class UpdateRequestArguments(_message.Message):
     def __init__(self, files: _Optional[_Union[FilesReferences, _Mapping]] = ..., tag_list: _Optional[_Union[TagList, _Mapping]] = ...) -> None: ...
 
 class UpdateTagsRequest(_message.Message):
-    __slots__ = ("args", "operation_tags")
+    __slots__ = ("args", "operation_tags", "node_reference")
     ARGS_FIELD_NUMBER: _ClassVar[int]
     OPERATION_TAGS_FIELD_NUMBER: _ClassVar[int]
+    NODE_REFERENCE_FIELD_NUMBER: _ClassVar[int]
     args: UpdateRequestArguments
-    operation_tags: TagList
-    def __init__(self, args: _Optional[_Union[UpdateRequestArguments, _Mapping]] = ..., operation_tags: _Optional[_Union[TagList, _Mapping]] = ...) -> None: ...
+    operation_tags: _containers.RepeatedScalarFieldContainer[str]
+    node_reference: ChordNodeReference
+    def __init__(self, args: _Optional[_Union[UpdateRequestArguments, _Mapping]] = ..., operation_tags: _Optional[_Iterable[str]] = ..., node_reference: _Optional[_Union[ChordNodeReference, _Mapping]] = ...) -> None: ...
 
 class FilesToReplicate(_message.Message):
     __slots__ = ("files", "location_hash", "main_replica_node_reference")
@@ -223,7 +225,7 @@ class RawDatabases(_message.Message):
     db_references: bytes
     def __init__(self, db_phisical: _Optional[bytes] = ..., db_references: _Optional[bytes] = ...) -> None: ...
 
-class FilesToUpdateRquest(_message.Message):
+class FilesToUpdateRequest(_message.Message):
     __slots__ = ("args", "node_reference")
     ARGS_FIELD_NUMBER: _ClassVar[int]
     NODE_REFERENCE_FIELD_NUMBER: _ClassVar[int]
