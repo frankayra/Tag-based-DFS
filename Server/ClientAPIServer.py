@@ -36,7 +36,7 @@ class ClientAPIServer(communication.ClientAPIServicer):
         self.ready_operations = self.chord_server.ready_operations
         
         self.active_threads = 0
-        ControlledThread(target=self.serve)
+        ControlledThread(target=self.serve, name="API serve")
     
 
     

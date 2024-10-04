@@ -210,3 +210,98 @@ class Files_References_DB(File_Tag_DB):
         return log, False
     def RecoveryFileContent_ByInfo(self, file_hash): 
         raise Exception("Se intento recuperar el contenido de un archivo en una base de datos de referencias solamente")
+
+
+
+
+    
+
+
+
+
+
+
+    #################### Metodos no debuggeados #####################
+
+
+    def RecoverFilesNames_ByTagQuery(self, tag_query, arg2=None):
+        """Obtener los archivos con TODOS los tags de la lista de tags: tag_query"""
+        File, Tag, FileTag = self.File, self.Tag, self.FileTag
+        query = (File
+                    .select(File, fn.COUNT(Tag.id).alias('tag_count'))
+                    .join(FileTag)
+                    .join(Tag)
+                    .where(Tag.name.in_(tag_query))
+                    .group_by(File)
+                    .having(fn.COUNT(Tag.id) == len(tag_query)))
+        result = [item.name for item in query]
+        return result
+    def RecoveryFilesInfo_ByTagQuery(self, tag_query, include_tags=False):
+        """Obtener información de identificacion unica de los archivos con TODOS los tags de la lista de tags: tag_query"""
+        File, Tag, FileTag = self.File, self.Tag, self.FileTag
+        query = (File
+                    .select(File, fn.COUNT(Tag.id).alias('tag_count'))
+                    .join(FileTag)
+                    .join(Tag)
+                    .where(Tag.name.in_(tag_query))
+                    .group_by(File)
+                    .having(fn.COUNT(Tag.id) == len(tag_query)))
+        result = ((item.name, item.file_hash, item.location_hash, [file_tag.tag.name for file_tag in item.tags]) for item in query)
+        return result if include_tags else ((item[0], item[1]) for item in result)
+
+
+    def DeleteFiles(self, tag_query, arg2=None):
+        File, Tag, FileTag = self.File, self.Tag, self.FileTag
+        files_query = self.RecoverFilesNames_ByTagQuery(tag_query)
+        delete_files_columns = File.delete().where(File.name.in_(files_query))
+        delete_files_tags_columns_subquery = [file_tag for file_tag in FileTag.select(FileTag).join(File).where(File.name.in_(files_query))]
+        delete_files_tags_columns_query = FileTag.delete().where(FileTag.id.in_(delete_files_tags_columns_subquery))
+
+        delete_files_columns.execute()
+        delete_files_tags_columns_query.execute()
+
+        return f"Se eliminaron los archivos: {files_query}"
+
+    def AddTags(self, tag_query, tags):
+        File, Tag, FileTag = self.File, self.Tag, self.FileTag
+        files_query = self.RecoveryFilesInfo_ByTagQuery(tag_query)
+        files_hashs = []
+        for file in files_query:
+            file_hash = file[1]
+            files_hashs.append(file_hash)
+
+        if len(files_hashs) == 0:
+            return "Ningun elemento coincide con la consulta"
+        for file_in_db in files_hashs:
+            # Tomar los tags que se van a añadir al archivo. Esto implica excluir los tags que ya estan asociados a cada archivo en la BD.
+            file_tags = [tag.name for tag in Tag.select(Tag).join(FileTag).where(FileTag.file == file_in_db)]
+            # Limpiar los tags que ya tenia el archivo.
+            filtered_tags_to_add = filter(lambda tag: tag not in file_tags, tags)
+            for tag_name in filtered_tags_to_add:
+                existing_tag = Tag.get_or_none(name=tag_name)
+                if not existing_tag:
+                    existing_tag = Tag.create(name=tag_name)
+                try:
+                    FileTag.create(file=file_in_db, tag=existing_tag)
+                except Exception as e:
+                    return f"Parametros no validos: {e}"
+                    
+                
+        return "Tags añadidas correctamente"
+
+
+
+    def DeleteTags(self, tag_query, tags):
+        """Desasocia los incluidos en tags de los archivos que cumplen con la tag query"""
+        # Decidi mantener los tags que queden sin asociarse a ningun archivo para no tener que agregarlos en el futuro. Una estrategia real que se 
+        # llevaria a cabo es liberar cada cierto tiempo la base de datos de tags que no son asociados hace tiempo a ningun archivo
+        File, Tag, FileTag = self.File, self.Tag, self.FileTag
+        files_query = self.RecoveryFilesInfo_ByTagQuery(tag_query)
+        for _, file_hash in files_query:
+            filtered_filetags_to_delete = [file_tag for file_tag in (FileTag
+                                                                        .select(FileTag)
+                                                                        .join(Tag)
+                                                                        .where(FileTag.file == file_hash)
+                                                                        .where(Tag.name.in_(tags)))]
+            FileTag.delete().where(FileTag.id.in_(filtered_filetags_to_delete)).execute()
+                

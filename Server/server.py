@@ -120,8 +120,11 @@ if __name__ == '__main__':
             for n in api_server.chord_server.finger_table:
                 print(f"  | ({n.id})")
             # print("   ⊢−-------------") # ◟∟−∸⊢⨽⫠_
-            print(f"   ◟ _______________ Hilos: {threading.active_count()}/{ControlledThread.max_threads}") # ◟∟−∸⊢⨽⫠_
-            # print(f"Hilos activos: {threading.active_count()}")
+            print(f"   ◟ _______________") # ◟∟−∸⊢⨽⫠_
+            print(f"Hilos activos: {threading.active_count()}/{ControlledThread.max_threads}")
+            for hilo in ControlledThread.active_threads.keys():
+                print(f" |-> {hilo}")
+            print("----------------------")
             time.sleep(20)  # Mantener el hilo principal activo
     except KeyboardInterrupt:
         print("Interrupción recibida. Saliendo del programa.")
