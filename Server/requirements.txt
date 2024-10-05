@@ -1,0 +1,5 @@
+grpcio
+grpcio-tools
+peewee
+docker
+watchdog==2.1.9

@@ -1,128 +1,180 @@
+from threading import Thread, Event
+import threading
 import time
-import random
-from hashlib import sha1
+import re
+import platform
+import os
+import sys
 import socket
-from concurrent import futures
+import random
 
 
-import logging
-import grpc
+import docker
 
 
-from gRPC import communication_pb2 as communication_messages
-from gRPC import communication_pb2_grpc as communication
-from DB import File_Tag_DB
-class ChordNodeReference:
-    def __init__(self, ip:str, port:int):
-        self.id = 0
-        self.ip = ip
-        self.port = port
-    @property
-    def hash_code(self):
-        return sha1((str(self.ip) + str(self.port)).encode('utf-8')).hexdigest()
-class ChordNode(communication.ClientAPIServicer):
-    def __init__(self, port:int, nodes_count:int):
-        ip = socket.gethostbyname(socket.gethostname())
-        self.NodeReference = ChordNodeReference(ip, port)
-        self.next:list[ChordNodeReference] = []
-        self.prev = None
-        self.finger_table:list[ChordNodeReference] = []
-        self.nodes_count:int = nodes_count
-        self.db_physical_files = File_Tag_DB('phisical_storage')
-        self.db_replicas = File_Tag_DB('replicas')
-        self.db_references = File_Tag_DB('references')
-    
-    def list(self, request, context):
-        """TagList {tags: string[]}    =>    FileGeneralInfo {title: string, tag_list: strin[], location: FileLocation {file_hash:int, location_hash: int}}"""
-
-        files_list = []
-        tag_query = [tag for tag in request.tags]
-        recovered_files = self.db_physical_files.RecoveryFilesInfo_ByTagQuery(tag_query, include_tags=True)
-
-        try:
-            first_file = next(recovered_files)
-            file_name, file_hash, file_location_hash, file_tags = first_file[0], first_file[1], first_file[2], first_file[3]
-            yield communication_messages.FileGeneralInfo(title=file_name,
-                                                            tag_list=file_tags,
-                                                            location=communication_messages.FileLocation(file_hash=file_hash, 
-                                                                                                            location_hash=file_location_hash))
-        except StopIteration:
-            print("No se encontraron archivos")
-            yield communication_messages.FileGeneralInfo(title="file_name not found",
-                                                            tag_list=[],
-                                                            location=communication_messages.FileLocation(file_hash='-1', 
-                                                                                                            location_hash=-1))
-            return
-        for file in recovered_files:
-            file_name = file[0]
-            file_hash = file[1]
-            file_location_hash = file[2]
-            file_tags = file[3]
-            yield communication_messages.FileGeneralInfo(title=file_name,
-                                                            tag_list=file_tags,
-                                                            location=communication_messages.FileLocation(file_hash=file_hash, 
-                                                                                                            location_hash=file_location_hash))
-
-    def fileContent(self, request, context):
-        """FileLocation {file_hash:int, location_hash:int}    =>    FileContent {title:string, content:string}"""
-        file_hash = request.file_hash
-        file_location_hash = request.location_hash
-        
-        recovered_file = self.db_physical_files.RecoveryFileContent_ByInfo(file_hash)
-        if not recovered_file: return communication_messages.FileContent(title=None, content=None)
-        return communication_messages.FileContent(title=recovered_file.name, content=recovered_file.content)
-    
-    def addFiles(self, request, context):
-        """FilesToAdd {files: FileContent[] {title: string, content: string}, tags: string[]}    =>    OperationResult {success: bool, message: string}"""
-        
-        selected_tag = random.choice(request.tags)
-        files_location_hash = int(sha1(selected_tag.encode('utf-8')).hexdigest(), 16) % self.nodes_count
-        try:
-            add_files_message = self.db_physical_files.AddFiles([(file.title, file.content) for file in request.files], [tag for tag in request.tags], files_location_hash)
-            return communication_messages.OperationResult(success=True, message=f"Archivos añadidos satisfactoriamente: {add_files_message}")
-        except Exception as e:
-            return communication_messages.OperationResult(success=False, message=f"Error al añadir los archivos solicitados: {e}")
-    
-    def addTags(self, request, context):
-        """TagQuery {tag_query: string[], operation_tags}    =>    OperationResult {success: bool, message: string}"""
-        try:
-            tag_query = [tag for tag in request.tags_query]
-            operation_tags = [tag for tag in request.operation_tags]
-            add_tags_message = self.db_physical_files.AddTags(tag_query, operation_tags)
-            return communication_messages.OperationResult(success=True, message=add_tags_message)
-        except Exception:
-            return communication_messages.OperationResult(success=False, message="Error al añadir los tags")
-    
-    def delete(self, request, context):
-        """TagList {tags: string}    =>    OperationResult {success: bool, message: string}"""
-        try:
-            tag_query = [tag for tag in request.tags]
-            delete_message = self.db_physical_files.DeleteFiles(tag_query)
-            return communication_messages.OperationResult(success=True, message=delete_message)
-        except Exception:
-            return communication_messages.OperationResult(success=False, message="Error al eliminar los archivos")
+from ChordServer import ChordServer
+from ChordClient import ChordClient, ChordNodeReference
+from ClientAPIServer import ClientAPIServer
+from controlled_thread import ControlledThread
 
 
-    
-    def deleteTags(self, request, context):
-        """TagQuery {tags_query: string[], operation_tags: string[]}    =>    OperationResult {success: bool, message: string}"""
-        try:
-            tag_query = [tag for tag in request.tags_query]
-            operation_tags = [tag for tag in request.operation_tags]
-            self.db_physical_files.DeleteTags(tag_query=tag_query, tags=operation_tags)
-            return communication_messages.OperationResult(success=True, message="Tags eliminados satisfactoriamente")
-        except Exception:
-            return communication_messages.OperationResult(success=False, message="Error al eliminar los tags")
 
-    
-    
-def serve(port='50051'):
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    communication.add_ClientAPIServicer_to_server(ChordNode(50051, 8), server)
-    server.add_insecure_port("[::]:" + port)
-    server.start()
-    print("Server started, listening on " + port)
-    server.wait_for_termination()
+
 
 if __name__ == '__main__':
-    serve()
+    parameters = sys.argv
+    server_to_request_entrance = None
+    nodes_count = 3
+    replication_factor = 2
+    next_alive_check_length = 2
+       
+    if len(parameters) == 2:
+        if parameters[1] == "localhost":
+            ip = "localhost"
+            port = 50051
+        elif parameters[1] == "docker-server":
+            hostname = socket.gethostname()
+            
+            # Via 1 (nombrecito)
+            ip = hostname
+            # Via 2 (ip real)
+            # ip = socket.gethostbyname(hostname)
+            
+            port = 50051
+    elif len(parameters) == 3:
+        port = int(parameters[1])
+        entrance_request_address = parameters[2]
+        exp = r'^(?P<ip>[\w\.]+):(?P<port>[\d]+)$'
+        coincidence = re.match(exp, entrance_request_address)
+        if coincidence:
+            ip = "localhost"
+            server_to_request_entrance = ChordNodeReference(ip=coincidence.group('ip'), port=coincidence.group('port'), id=-1) 
+                
+    api_server = ClientAPIServer(ip, port, nodes_count, replication_factor, next_alive_check_length, server_to_request_entrance)
+
+
+
+
+    
+    # nodes_count = int(input("Cantidad de bits de identificador: "))
+    # replication_factor = int(input("factor de replicacion: "))
+    # while(replication_factor > 2**nodes_count):
+    #     print("El factor de replicacion no deberia ser mayor que la cantidad de nodos de la red")
+    #     replication_factor = int(input("factor de replicacion: "))
+
+    # port = int(input("Puerto para la Api (Tener en cuenta que tambien se usa internamente [el puerto que escojas  +1] asi que debe estar libre): "))
+    # entrance_request_address = input("Provee la direccion de un nodo del anillo para entrar a traves de el. Debe ser en el formato ip:puerto. Si quieres que se cree un nuevo anillo, solo deja en blanco este campo: ")
+    # exp = r'^(?P<ip>[\w\.]+):(?P<port>[\d]+)$'
+    # coincidence = re.match(exp, entrance_request_address)
+    # server_to_request_entrance = None
+    # if coincidence:
+    #     server_to_request_entrance = ChordNodeReference(ip=coincidence.group('ip'), port=coincidence.group('port'), id=-1) 
+    
+    
+
+    ######### Propiedades globales ##########
+    # nodes_count = 3
+    # replication_factor = 2
+    # next_alive_check_length = 2
+
+    ######### Primer Nodo ##########
+    # port = 50051
+    # server_to_request_entrance = None
+
+    ######### Nodo entrante ##########
+    # port = 50053
+    # server_to_request_entrance = ChordNodeReference("localhost", 50052, -1)
+
+
+
+    
+    
+    # api_server = ClientAPIServer(port, nodes_count, replication_factor, next_alive_check_length, server_to_request_entrance)
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+    time.sleep(5)
+    try:
+        while True:
+            # operating_s = platform.system()
+            # if operating_s == "Windows":
+            #     os.system('cls')
+            # else:
+            #     os.system('clear')
+            print(f"mi id es: {api_server.chord_server.node_reference.id}")
+            print("proximos: ", [f"{n.id}--> {n.ip}:{n.port} " for n in api_server.chord_server.next])
+            if api_server.chord_server.prev:
+                print("anterior: ", f"{api_server.chord_server.prev.id}--> {api_server.chord_server.prev.ip}:{api_server.chord_server.prev.port}")
+            print("Finger Table: ")
+            for n in api_server.chord_server.finger_table:
+                print(f"  | ({n.id})")
+            # print("   ⊢−-------------") # ◟∟−∸⊢⨽⫠_
+            print(f"   ◟ _______________") # ◟∟−∸⊢⨽⫠_
+            print(f"Hilos activos: {threading.active_count()}/{ControlledThread.max_threads}")
+            for hilo in ControlledThread.active_threads.keys():
+                print(f" |-> {hilo}")
+            print("----------------------")
+            time.sleep(20)  # Mantener el hilo principal activo
+    except KeyboardInterrupt:
+        print("Interrupción recibida. Saliendo del programa.")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    # running_on_docker_container_input = input("Estas iniciando desde un contenedor Docker??(Si|No) ")
+    # match running_on_docker_container_input.casefold():
+    #     case "si": ip = docker_container_name
+    #     case "no": ip = socket.gethostbyname(socket.gethostname())
+
+        # # Señalizar a los hilos que deben detenerse
+        # stop_threads.set()  
+        # # Esperar a que los hilos terminen
+        # API_thread.join(timeout=1)          
+        # ChordServer_thread.join(timeout=1)
+        # print("Programa finalizado de manera ordenada.")
+
+# def running_on_docker():
+#     client = docker.from_env()
+#     network_name = "ds-network"
+#     try:
+#         # Obtener la red especificada
+#         network = client.networks.get(network_name)
+        
+#         # Obtener los contenedores conectados a la red
+#         containers = network.containers
+#         print(f"Contenedores en la red '{network_name}':")
+#         for container in containers:
+#             print(f"- {container.name} ({container.short_id})")
+#             name = contenedor.name
+#             networks = info.get('NetworkSettings', {}).get('Networks', {})
+#             ip_address = networks.get(network_name, {}).get('IPAddress', 'N/A')
+#         return containers
+#     except docker.errors.NotFound:
+#         print(f"La red '{network_name}' no existe.")
+#         return []
+
+

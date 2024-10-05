@@ -28,40 +28,40 @@ async def actions(action: str, arg1_list, arg2_list):
                     with open(file_name, 'rb') as file:
                         file_content = file.read()
                         files.append(communication_messages.FileContent(title=file_name, content=file_content))
-                response = stub.addFiles(communication_messages.FilesToAdd(files=files, tags=arg2_list))
+                response = stub.addFiles(communication_messages.FilesToAdd(files=files, tags=arg2_list), timeout=2)
                 return f'response.success: {response.success}\nresponse.message: {response.message}'
             case 'add-tags':
-                response = stub.addTags(communication_messages.TagQuery(tags_query=arg1_list, operation_tags=arg2_list))
+                response = stub.addTags(communication_messages.TagQuery(tags_query=arg1_list, operation_tags=arg2_list), timeout=2)
                 return f'response.success: {response.success}\nresponse.message: {response.message}'
             case 'delete':
-                response = stub.delete(communication_messages.TagList(tags=arg1_list))
+                response = stub.delete(communication_messages.TagList(tags=arg1_list), timeout=2)
 
                 return f'response.success: {response.success}\nresponse.message: {response.message}'
             case 'delete-tags':
-                response = stub.deleteTags(communication_messages.TagQuery(tags_query=arg1_list, operation_tags=arg2_list))
+                response = stub.deleteTags(communication_messages.TagQuery(tags_query=arg1_list, operation_tags=arg2_list), timeout=2)
                 return f'response.success: {response.success}\nresponse.message: {response.message}'
 
                
                 
             case 'list':
                 print("Listing...")
-                response = stub.list(communication_messages.TagList(tags=arg1_list))
+                response = stub.list(communication_messages.TagList(tags=arg1_list), timeout=2)
+
                 result = ""
                 for file_info in response:
                     if file_info.location.file_hash == "-1":
                         return "no files found"
                     cache[file_info.location.file_hash] = (file_info.title, file_info.location.location_hash)
                     result+=f"{file_info.location.file_hash} -> \"{file_info.title}\"      {file_info.tag_list}\n"
-                
-
                 return result
+                
             case 'file-content':
                 file_name, location_hash = cache[arg1_list[0]]
                 
                 if not file_name:
                     return "No se ha recuperado tal archivo, para acceder a el tene que haber sido recuperado en esta sesion"
 
-                response = stub.fileContent(communication_messages.FileLocation(file_hash=arg1_list[0], location_hash=location_hash))
+                response = stub.fileContent(communication_messages.FileLocation(file_hash=arg1_list[0], location_hash=location_hash), timeout=2)
                 if not response.title and not response.content:
                     return f"\nNo se encontro el archivo especificado('{file_name}'), este fue movido o eliminado de la BD."
                 return f"\n   📰: \"{response.title}\" \n{response.content}"
@@ -88,15 +88,25 @@ async def RunTerminalClient():
         case "si": running_on_docker_container = True
         case "no": running_on_docker_container = False
     cache = Cache()
+    def wrapped_actions(action:str, arg1_list, arg2_list):
+
+        try:
+            return actions(action, arg1_list, arg2_list)
+        except grpc._channel._MultiThreadedRendezvous as e:
+            # Captura esta excepcion especifica de gRPC
+            print(f"Se produjo una excepción de gRPC: {e}")
+        except Exception as e:
+            return "Hubo problemas encontrando respuesta en los servers"
+
     await RunPrompt(commands={
-        'add': actions,
-        'list': actions,
-        'delete': actions,
-        'add-tags': actions,
-        'delete-tags': actions,
-        "file-content": actions,
-        'cache': actions,
-        'clear-cache': actions,
+        'add': wrapped_actions,
+        'list': wrapped_actions,
+        'delete': wrapped_actions,
+        'add-tags': wrapped_actions,
+        'delete-tags': wrapped_actions,
+        "file-content": wrapped_actions,
+        'cache': wrapped_actions,
+        'clear-cache': wrapped_actions,
     })
 class Cache:
     def __init__(self, capacity=10):
@@ -159,48 +169,48 @@ if __name__ == '__main__':
 
 
 ######################### FLASK SERVER #########################
-app = Flask(__name__)
-CORS(app)
-@app.route('/')
-def index():
-    pass
+# app = Flask(__name__)
+# CORS(app)
+# @app.route('/')
+# def index():
+#     pass
 
 
-@app.route('/add?q=<query>')
-def add(tag_query):
-    files = request.headers['files']
-    print()
-    pass
-@app.route('/list')
-def list_():
-    pass
-@app.route('/delete')
-def delete():
-    pass
-@app.route('/add-tags')
-def add_tags():
-    pass
-@app.route('/delete-tags')
-def delete_tags():
-    pass
+# @app.route('/add?q=<query>')
+# def add(tag_query):
+#     files = request.headers['files']
+#     print()
+#     pass
+# @app.route('/list')
+# def list_():
+#     pass
+# @app.route('/delete')
+# def delete():
+#     pass
+# @app.route('/add-tags')
+# def add_tags():
+#     pass
+# @app.route('/delete-tags')
+# def delete_tags():
+#     pass
 
-@app.route('/', methods=['GET'])
-def home():
-    # Simulando la comunicación con el cliente gRPC
-    channel = grpc.insecure_channel('localhost:50051')
-    stub = communication.CommunicationStub(channel)
-    return jsonify({'mensaje': 'Hola desde F-T-system'})
+# @app.route('/', methods=['GET'])
+# def home():
+#     # Simulando la comunicación con el cliente gRPC
+#     channel = grpc.insecure_channel('localhost:50051')
+#     stub = communication.CommunicationStub(channel)
+#     return jsonify({'mensaje': 'Hola desde F-T-system'})
 
-def run():
-    with grpc.insecure_channel('localhost:50051') as channel:
-        stub = communication.ClientAPIStub(channel)
-        response = stub.GetMessage(communication_messages.Empty())
-        return jsonify({'mensaje': response.message})
-    with grpc.insecure_channel('localhost:50051') as channel:
-        stub = greet_pb2_grpc.GreeterStub(channel)
-        response = stub.SayHello(greet_pb2.HelloRequest(name='world'))
-    print("Greeter client received: " + response.message)
+# def run():
+#     with grpc.insecure_channel('localhost:50051') as channel:
+#         stub = communication.ClientAPIStub(channel)
+#         response = stub.GetMessage(communication_messages.Empty())
+#         return jsonify({'mensaje': response.message})
+#     with grpc.insecure_channel('localhost:50051') as channel:
+#         stub = greet_pb2_grpc.GreeterStub(channel)
+#         response = stub.SayHello(greet_pb2.HelloRequest(name='world'))
+#     print("Greeter client received: " + response.message)
  
-if __name__ == '__main__':
-    # app.run(debug=True, host="0.0.0.0", port=3000)
-    pass
+# if __name__ == '__main__':
+#     # app.run(debug=True, host="0.0.0.0", port=3000)
+#     pass
