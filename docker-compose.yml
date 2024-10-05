@@ -4,18 +4,27 @@ services:
   ds-server-principal:
     build: .
     ports:
-      - "8000:50051"  # Ajusta el puerto según tu aplicación
+      - "50051:50051"  # Ajusta el puerto según tu aplicación
     volumes:
       - ./Server:/usr/src/app  # Monta el directorio de la aplicación
       - /usr/src/app/__pycache__  # Evita que el directorio __pycache__ del host sobrescriba el del contenedor
     environment:
+      - DOCKER_HOST=tcp://host.docker.internal:2375
       - PYTHONUNBUFFERED=1  # Opcional: mejora la salida de logs
     tty: true         # Asignar una terminal para la interacción
+    networks:
+      - ds-network
   ds-server:
     build: .
     volumes:
       - ./Server:/usr/src/app  # Monta el directorio de la aplicación
       - /usr/src/app/__pycache__  # Evita que el directorio __pycache__ del host sobrescriba el del contenedor
     environment:
+      - DOCKER_HOST=tcp://host.docker.internal:2375
       - PYTHONUNBUFFERED=1  # Opcional: mejora la salida de logs
     tty: true         # Asignar una terminal para la interacción
+    networks:
+      - ds-network
+networks:
+  ds-network:
+    driver: bridge
