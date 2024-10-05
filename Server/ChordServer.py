@@ -172,8 +172,11 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
 
         # (pending_op, info) = self.pending_operations.get(operation_id, (None, None))
         (pending_op, info) = self.pending_operations.pop(operation_id, (None, None))
-        if not pending_op or pending_op != operation:
+        if not info or pending_op != operation:
             print("Se solicito una operacion que no estaba pendiente")
+            print(f"operation_ID: {operation_id}")
+            print(f"pending_op: {pending_op}")
+            print(f"operation: {operation}")
             with self.ready_operations_locker:
                 self.ready_operations[operation_id] = Exception(f"Error al realizar la operacion {str(operation).casefold()}, dicha operacion que no estaba pendiente")
             return 
