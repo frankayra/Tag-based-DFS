@@ -610,7 +610,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
 # ----------------------------------
     def node_entrance_request(self, request, context):                                                              # ✅
         print("🔹 Entre en node_entrance_request")
-        
+        self.entrance_resolved = True
         # Verificando si se puede dar de alta al nuevo nodo aqui mismo.
         # ----------------------------------
         # Verificando si el nodo esta dentro de los ids que el nodo actual maneja y este puede ponerlo como su anterior, integrandolo a la red.
