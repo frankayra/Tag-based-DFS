@@ -201,11 +201,11 @@ class ClientAPIServer(communication.ClientAPIServicer):
                 return self.chord_server.add_tags(request, context)
 
         random_selected_tag = random.choice(tag_query)
-        operation_id = int(sha1(random_selected_tag.encode("utf-8")).hexdigest(), 16) 
+        operation_id = int(sha1(random_selected_tag.encode("utf-8")).hexdigest(), 16) % 1000000
         random_selected_tag_hash = operation_id % (2**self.chord_server.nodes_count)
 
         wait_for_results = self.PushPendingOperation(operation_id=operation_id, operation=communication_messages.ADD_TAGS, info=request)
-        self.chord_client.succesor(node_reference=self.chord_server.node_reference, searching_id=random_selected_tag_hash, requested_operation=communication_messages.ADD_TAGS, operation_id=operation_id)
+        self.chord_client.succesor(requesting_node=self.chord_server.node_reference, node_reference=self.chord_server.next[0], searching_id=random_selected_tag_hash, requested_operation=communication_messages.ADD_TAGS, operation_id=operation_id)
         results = wait_for_results()
 
         if isinstance(results, Exception):
@@ -225,11 +225,11 @@ class ClientAPIServer(communication.ClientAPIServicer):
                 return self.chord_server.delete(request, context)
 
         random_selected_tag = random.choice(tag_query)
-        operation_id = int(sha1(random_selected_tag.encode("utf-8")).hexdigest(), 16) 
+        operation_id = int(sha1(random_selected_tag.encode("utf-8")).hexdigest(), 16) % 1000000
         random_selected_tag_hash = operation_id % (2**self.chord_server.nodes_count)
 
         wait_for_results = self.PushPendingOperation(operation_id=operation_id, operation=communication_messages.DELETE, info=request)
-        self.chord_client.succesor(node_reference=self.chord_server.node_reference, searching_id=random_selected_tag_hash, requested_operation=communication_messages.DELETE, operation_id=operation_id)
+        self.chord_client.succesor(requesting_node=self.chord_server.node_reference, node_reference=self.chord_server.next[0], searching_id=random_selected_tag_hash, requested_operation=communication_messages.DELETE, operation_id=operation_id)
         results = wait_for_results()
 
         if isinstance(results, Exception):
@@ -250,11 +250,11 @@ class ClientAPIServer(communication.ClientAPIServicer):
                 return self.chord_server.delete_tags(request, context)
 
         random_selected_tag = random.choice(tag_query)
-        operation_id = int(sha1(random_selected_tag.encode("utf-8")).hexdigest(), 16) 
+        operation_id = int(sha1(random_selected_tag.encode("utf-8")).hexdigest(), 16) % 1000000
         random_selected_tag_hash = operation_id % (2**self.chord_server.nodes_count)
 
         wait_for_results = self.PushPendingOperation(operation_id=operation_id, operation=communication_messages.DELETE_TAGS, info=request)
-        self.chord_client.succesor(node_reference=self.chord_server.node_reference, searching_id=random_selected_tag_hash, requested_operation=communication_messages.DELETE_TAGS, operation_id=operation_id)
+        self.chord_client.succesor(requesting_node=self.chord_server.node_reference, node_reference=self.chord_server.next[0], searching_id=random_selected_tag_hash, requested_operation=communication_messages.DELETE_TAGS, operation_id=operation_id)
         results = wait_for_results()
 
         if isinstance(results, Exception):
