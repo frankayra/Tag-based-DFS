@@ -6,7 +6,7 @@ import platform
 import os
 import sys
 import socket
-
+import random
 
 
 import docker
@@ -32,23 +32,15 @@ if __name__ == '__main__':
         if parameters[1] == "localhost":
             ip = "localhost"
             port = 50051
-        elif parameters[1] == "localgest":
-            ip = "localhost"
-            server_to_request_entrance = ChordNodeReference(ip="localhost", port=50052, id=-1) 
-
-            # Autodescubrimiento de puertos
-            # with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            #     s.settimeout(1)
-            #     for test_port in range(50051, 50200):
-
-            #         try:
-            #             s.connect(("localhost", test_port)) # s.bind((host, puerto))
-            #             print(f"puerto {test_port} ocupado")
-            #         except socket.error:
-            #             port = test_port
-            #             break
-
-            port = 50053
+        elif parameters[1] == "docker-server":
+            hostname = socket.gethostname()
+            
+            # Via 1 (nombrecito)
+            ip = hostname
+            # Via 2 (ip real)
+            # ip = socket.gethostbyname(hostname)
+            
+            port = 50051
     elif len(parameters) == 3:
         port = int(parameters[1])
         entrance_request_address = parameters[2]
@@ -128,8 +120,11 @@ if __name__ == '__main__':
             for n in api_server.chord_server.finger_table:
                 print(f"  | ({n.id})")
             # print("   ⊢−-------------") # ◟∟−∸⊢⨽⫠_
-            print(f"   ◟ _______________ Hilos: {threading.active_count()}/{ControlledThread.max_threads}") # ◟∟−∸⊢⨽⫠_
-            # print(f"Hilos activos: {threading.active_count()}")
+            print(f"   ◟ _______________") # ◟∟−∸⊢⨽⫠_
+            print(f"Hilos activos: {threading.active_count()}/{ControlledThread.max_threads}")
+            for hilo in ControlledThread.active_threads.keys():
+                print(f" |-> {hilo}")
+            print("----------------------")
             time.sleep(20)  # Mantener el hilo principal activo
     except KeyboardInterrupt:
         print("Interrupción recibida. Saliendo del programa.")

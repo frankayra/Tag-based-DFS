@@ -5,7 +5,7 @@ class ControlledThread:
     active_threads = {}
     # active_threads_count = 0
     _being_used = False
-    max_threads = 8
+    max_threads = 9
     def __init__(self, target, args:tuple = (), name:str=None, wait_time = 3):
         starting_time = time.time()
 

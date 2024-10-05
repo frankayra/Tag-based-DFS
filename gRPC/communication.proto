@@ -64,8 +64,8 @@ service ChordNetworkCommunication{
     rpc send_raw_database_replica (RawDatabases) returns (OperationResult);
     
     rpc add_references (FilesReferencesToAdd) returns (OperationResult);
-    rpc delete_files_replicas (FilesToUpdateRquest) returns (OperationResult);
-    rpc delete_files_references (FilesToUpdateRquest) returns (OperationResult);
+    rpc delete_files_replicas (FilesToUpdateRequest) returns (OperationResult);
+    rpc delete_files_references (UpdateRequestArguments) returns (OperationResult);
 
     rpc add_tags_to_refered_files (UpdateTagsRequest) returns (OperationResult);
     rpc add_tags_to_replicated_files (UpdateTagsRequest) returns (OperationResult);
@@ -73,7 +73,7 @@ service ChordNetworkCommunication{
     rpc delete_tags_from_replicated_files (UpdateTagsRequest) returns (OperationResult);
 
     
-    rpc heartbeat (Empty) returns (Empty);
+    rpc heartbeat (ChordNodeReference) returns (Empty);
     rpc alive_request (Empty) returns (LiveAnswer);
     rpc unreplicate (ChordNodeReference) returns (OperationResult);
     
@@ -163,7 +163,8 @@ message UpdateRequestArguments {
 }
 message UpdateTagsRequest {
     UpdateRequestArguments args = 1; 
-    TagList operation_tags = 2;
+    repeated string operation_tags = 2;
+    optional ChordNodeReference node_reference = 3;
 }
 message FilesToReplicate {
     FilesToAdd files = 1;
@@ -175,7 +176,7 @@ message RawDatabases {
     bytes db_phisical = 1;
     bytes db_references = 2;
 }
-message FilesToUpdateRquest {
+message FilesToUpdateRequest {
     UpdateRequestArguments args = 1;
     ChordNodeReference node_reference = 2;
 }

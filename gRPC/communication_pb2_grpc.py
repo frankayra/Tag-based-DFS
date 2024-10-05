@@ -380,12 +380,12 @@ class ChordNetworkCommunicationStub(object):
                 _registered_method=True)
         self.delete_files_replicas = channel.unary_unary(
                 '/TagBasedFileSystem.ChordNetworkCommunication/delete_files_replicas',
-                request_serializer=communication__pb2.FilesToUpdateRquest.SerializeToString,
+                request_serializer=communication__pb2.FilesToUpdateRequest.SerializeToString,
                 response_deserializer=communication__pb2.OperationResult.FromString,
                 _registered_method=True)
         self.delete_files_references = channel.unary_unary(
                 '/TagBasedFileSystem.ChordNetworkCommunication/delete_files_references',
-                request_serializer=communication__pb2.FilesToUpdateRquest.SerializeToString,
+                request_serializer=communication__pb2.UpdateRequestArguments.SerializeToString,
                 response_deserializer=communication__pb2.OperationResult.FromString,
                 _registered_method=True)
         self.add_tags_to_refered_files = channel.unary_unary(
@@ -410,7 +410,7 @@ class ChordNetworkCommunicationStub(object):
                 _registered_method=True)
         self.heartbeat = channel.unary_unary(
                 '/TagBasedFileSystem.ChordNetworkCommunication/heartbeat',
-                request_serializer=communication__pb2.Empty.SerializeToString,
+                request_serializer=communication__pb2.ChordNodeReference.SerializeToString,
                 response_deserializer=communication__pb2.Empty.FromString,
                 _registered_method=True)
         self.alive_request = channel.unary_unary(
@@ -709,12 +709,12 @@ def add_ChordNetworkCommunicationServicer_to_server(servicer, server):
             ),
             'delete_files_replicas': grpc.unary_unary_rpc_method_handler(
                     servicer.delete_files_replicas,
-                    request_deserializer=communication__pb2.FilesToUpdateRquest.FromString,
+                    request_deserializer=communication__pb2.FilesToUpdateRequest.FromString,
                     response_serializer=communication__pb2.OperationResult.SerializeToString,
             ),
             'delete_files_references': grpc.unary_unary_rpc_method_handler(
                     servicer.delete_files_references,
-                    request_deserializer=communication__pb2.FilesToUpdateRquest.FromString,
+                    request_deserializer=communication__pb2.UpdateRequestArguments.FromString,
                     response_serializer=communication__pb2.OperationResult.SerializeToString,
             ),
             'add_tags_to_refered_files': grpc.unary_unary_rpc_method_handler(
@@ -739,7 +739,7 @@ def add_ChordNetworkCommunicationServicer_to_server(servicer, server):
             ),
             'heartbeat': grpc.unary_unary_rpc_method_handler(
                     servicer.heartbeat,
-                    request_deserializer=communication__pb2.Empty.FromString,
+                    request_deserializer=communication__pb2.ChordNodeReference.FromString,
                     response_serializer=communication__pb2.Empty.SerializeToString,
             ),
             'alive_request': grpc.unary_unary_rpc_method_handler(
@@ -1122,7 +1122,7 @@ class ChordNetworkCommunication(object):
             request,
             target,
             '/TagBasedFileSystem.ChordNetworkCommunication/delete_files_replicas',
-            communication__pb2.FilesToUpdateRquest.SerializeToString,
+            communication__pb2.FilesToUpdateRequest.SerializeToString,
             communication__pb2.OperationResult.FromString,
             options,
             channel_credentials,
@@ -1149,7 +1149,7 @@ class ChordNetworkCommunication(object):
             request,
             target,
             '/TagBasedFileSystem.ChordNetworkCommunication/delete_files_references',
-            communication__pb2.FilesToUpdateRquest.SerializeToString,
+            communication__pb2.UpdateRequestArguments.SerializeToString,
             communication__pb2.OperationResult.FromString,
             options,
             channel_credentials,
@@ -1284,7 +1284,7 @@ class ChordNetworkCommunication(object):
             request,
             target,
             '/TagBasedFileSystem.ChordNetworkCommunication/heartbeat',
-            communication__pb2.Empty.SerializeToString,
+            communication__pb2.ChordNodeReference.SerializeToString,
             communication__pb2.Empty.FromString,
             options,
             channel_credentials,
