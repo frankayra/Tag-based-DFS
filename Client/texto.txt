@@ -1,0 +1,3 @@
+Un sistema distribuido es complejo de diseñar y llevar a cabo.
+La estructura/arquitectura del mismo es fundamental preverla antes
+de incluso pensar en codificar.
