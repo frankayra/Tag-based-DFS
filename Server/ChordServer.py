@@ -135,6 +135,13 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         try:
             network = client.networks.get(network_name)
             containers = network.attrs['Containers']
+
+            # Obtener la IP del contenedor actual
+            current_container_name = socket.gethostname()
+            current_container = client.containers.get(current_container_name)
+            current_container_ip = None
+            if network_name in current_container.attrs['NetworkSettings']['Networks']:
+                current_container_ip = current_container.attrs['NetworkSettings']['Networks'][network_name]['IPAddress']
         except Exception as e:
             print("La red especificada no se encontro. Estas son las redes disponibles")
             for net in client.networks.list():
@@ -152,7 +159,8 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         nodes = []
         for container_id, container_info in containers.items():
             container_ip = container_info['IPv4Address'].split('/')[0]  # Obtener solo la IP
-            nodes.append(container_ip)
+            if container_ip != current_container_ip:
+                nodes.append(container_ip)
 
         return nodes
     def Manage_Heartbeats_AliveRequests(self):
@@ -610,7 +618,9 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
 # ----------------------------------
     def node_entrance_request(self, request, context):                                                              # ✅
         print("🔹 Entre en node_entrance_request")
-        self.entrance_resolved = True
+        if not self.entrance_resolved:
+            self.entrance_resolved = True
+            self.node_reference.id = random.randint(0, (2**self.nodes_count)-1)
         # Verificando si se puede dar de alta al nuevo nodo aqui mismo.
         # ----------------------------------
         # Verificando si el nodo esta dentro de los ids que el nodo actual maneja y este puede ponerlo como su anterior, integrandolo a la red.
