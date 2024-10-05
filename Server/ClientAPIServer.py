@@ -4,6 +4,7 @@ from hashlib import sha1
 import socket
 from concurrent import futures
 from threading import Thread
+import threading
 
 
 import logging
@@ -35,14 +36,13 @@ class ClientAPIServer(communication.ClientAPIServicer):
         self.pending_operations = self.chord_server.pending_operations
         self.ready_operations = self.chord_server.ready_operations
         
-        self.active_threads = 0
         ControlledThread(target=self.serve, name="API serve")
     
 
     
 
     def serve(self):
-        server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+        server = grpc.server(futures.ThreadPoolExecutor(max_workers=1))
         communication.add_ClientAPIServicer_to_server(self, server)
         server.add_insecure_port("[::]:" + str(self.port))
         server.start()
@@ -54,11 +54,12 @@ class ClientAPIServer(communication.ClientAPIServicer):
         start_time = time.time()
         waiting_time = 3
         while(True):
-            time.sleep(0.05)
-            if time.time()-start_time % 2 == 0: print("Esperando resultados....")
-            result = self.chord_server.ready_operations.get(id, None)
-            if result: return
-            if time.time() - start_time > waiting_time: return
+            time.sleep(1)
+            # if time.time()-start_time % 2 == 0: print("Esperando resultados....")
+            with self.chord_server.ready_operations_locker:
+                result = self.chord_server.ready_operations.get(id, None)
+            if result: return True
+            if time.time() - start_time > waiting_time: return False
     
 
         
@@ -70,13 +71,17 @@ class ClientAPIServer(communication.ClientAPIServicer):
         # checking_for_results_thread = Thread(target=self.check_for_ready_operation, args=(operation_id,))
         def wait_for_results():
             print("invocamos el metodo de espera......")
-            # checking_for_results_thread.start()
-            # checking_for_results_thread.join()
-            self.check_for_ready_operation(operation_id)
-            print(f"aqui los resultados se pueden ver desde ClientAPI{self.ready_operations[operation_id]}")
-            result = self.ready_operations[operation_id]
-            del self.ready_operations[operation_id]
-            print(f"result a la hora de chequear: {result}")
+
+            results_ready = self.check_for_ready_operation(operation_id)
+            # print(f"aqui los resultados se pueden ver desde ClientAPI: {self.ready_operations[operation_id]}")
+            if not results_ready: result = None
+            else:
+                with self.chord_server.ready_operations_locker:
+                    result = self.ready_operations.pop(operation_id, None)
+
+            # result = self.ready_operations[operation_id]
+            # del self.ready_operations[operation_id]
+            # print(f"result a la hora de chequear: {result}")
             return result
         return wait_for_results
         
@@ -98,11 +103,17 @@ class ClientAPIServer(communication.ClientAPIServicer):
     def list(self, request, context):
         """TagList {tags: string[]}    =>    FileGeneralInfo {title: string, tag_list: strin[], location: FileLocation {file_hash:int, location_hash: int}}"""
         tag_query = [tag for tag in request.tags]
-        print(f"tag query: {tag_query}")
+        # print(f"tag query: {tag_query}")
         for tag in tag_query:
             tag_id = int(sha1(tag.encode("utf-8")).hexdigest(), 16) % (2**self.chord_server.nodes_count)
             if self.belonging_id(tag_id):
                 results = self.chord_server.list(request, context)
+                if not results or len(results.files_general_info) == 0:
+                    yield communication_messages.FileGeneralInfo(title="no files",
+                                                                    tag_list=[],
+                                                                    location=communication_messages.FileLocation(file_hash='-1', 
+                                                                                                                    location_hash=-1))
+                    return
                 for file in results.files_general_info:
                     yield file
                 return
@@ -112,22 +123,25 @@ class ClientAPIServer(communication.ClientAPIServicer):
 
         operation_id = int(sha1(random_selected_tag.encode("utf-8")).hexdigest(), 16) % 1000000                    # TODO verificar que el protocolo envie apropiadamente este id y retorne intacto de la operacion de successor()
         
-        print(f"request del cliente: {request}")
         wait_for_results = self.PushPendingOperation(operation_id=operation_id, operation=communication_messages.LIST, info=request)
-        info = communication_messages.RingOperationRequest(requesting_node=self.chord_server.node_reference.grpc_format, searching_id=random_selected_tag_hash, requested_operation=communication_messages.LIST, operation_id=operation_id)
+        # info = communication_messages.RingOperationRequest(requesting_node=self.chord_server.node_reference.grpc_format, searching_id=random_selected_tag_hash, requested_operation=communication_messages.LIST, operation_id=operation_id)
         # self.chord_client.succesor(requesting_node=self.chord_server.node_reference, node_reference=self.chord_server.node_reference, searching_id=random_selected_tag_hash, requested_operation=communication_messages.LIST, operation_id= operation_id)
-        self.chord_server.succesor(info, context)
+        self.chord_client.succesor(requesting_node=self.chord_server.node_reference, node_reference=self.chord_server.next[0], searching_id=random_selected_tag_hash, requested_operation=communication_messages.LIST, operation_id=operation_id)
+        # self.chord_server.succesor(info, context)
         results = wait_for_results()
-        
-        if len(results.files_general_info) == 0:
-            yield communication_messages.FileGeneralInfo(title=results.message,
-                                                            tag_list=[],
-                                                            location=communication_messages.FileLocation(file_hash='-1', 
-                                                                                                            location_hash=-1))
-            return
+        # print(f"'results' antes de entregarselo al cliente: {results}")
+        try:
+            if not results or len(results.files_general_info) == 0:
+                yield communication_messages.FileGeneralInfo(title="no file found",
+                                                                tag_list=[],
+                                                                location=communication_messages.FileLocation(file_hash='-1', 
+                                                                                                                location_hash=-1))
+                return
 
-        for item in results.files_general_info:
-            yield item        
+            for item in results.files_general_info:
+                yield item        
+        except grpc.RpcError or Exception:
+            print("error jeje")
         
     def fileContent(self, request, context):
         """FileLocation {file_hash:int, location_hash:int}    =>    FileContent {title:string, content:string}"""
@@ -162,15 +176,16 @@ class ClientAPIServer(communication.ClientAPIServicer):
             if self.belonging_id(tag_id):
                 return self.chord_server.add_files(communication_messages.FilesToAddWithLocation(files=request.files, tags=request.tags, location_hash=tag_id), context)
         random_selected_tag = random.choice(tag_query)
-        operation_id = int(sha1(random_selected_tag.encode("utf-8")).hexdigest(), 16) 
-        random_selected_tag_hash = operation_id % (2**self.chord_server.nodes_count)
+        operation_id = int(sha1(random_selected_tag.encode("utf-8")).hexdigest(), 16) % 1000000
+        random_selected_tag_hash = int(sha1(random_selected_tag.encode("utf-8")).hexdigest(), 16) % (2**self.chord_server.nodes_count)
 
         wait_for_results = self.PushPendingOperation(operation_id=operation_id, operation=communication_messages.ADD_FILES, info=request)
-        self.chord_client.succesor(node_reference=self.chord_server.node_reference, searching_id=random_selected_tag_hash, requested_operation=communication_messages.ADD_FILES, operation_id=operation_id)
+        self.chord_client.succesor(requesting_node=self.chord_server.node_reference, node_reference=self.chord_server.next[0], searching_id=random_selected_tag_hash, requested_operation=communication_messages.ADD_FILES, operation_id=operation_id)
         results = wait_for_results()
 
+
         if isinstance(results, Exception):
-            return communication_messages.OperationResult(success=False, message=results.message)
+            return communication_messages.OperationResult(success=False, message=str(results))
 
         return results
         
@@ -193,7 +208,7 @@ class ClientAPIServer(communication.ClientAPIServicer):
         results = wait_for_results()
 
         if isinstance(results, Exception):
-            return communication_messages.OperationResult(success=False, message=results.message)
+            return communication_messages.OperationResult(success=False, message=str(results))
 
         return results
 
@@ -217,7 +232,7 @@ class ClientAPIServer(communication.ClientAPIServicer):
         results = wait_for_results()
 
         if isinstance(results, Exception):
-            return communication_messages.OperationResult(success=False, message=results.message)
+            return communication_messages.OperationResult(success=False, message=str(results))
 
         return results
 
@@ -242,7 +257,7 @@ class ClientAPIServer(communication.ClientAPIServicer):
         results = wait_for_results()
 
         if isinstance(results, Exception):
-            return communication_messages.OperationResult(success=False, message=results.message)
+            return communication_messages.OperationResult(success=False, message=str(results))
 
         return results
 

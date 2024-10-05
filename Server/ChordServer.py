@@ -40,6 +40,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         
         self.pending_operations = {}
         self.ready_operations = {}
+        self.ready_operations_locker = threading.Lock()
 
         # Heartbeat & Alilve Request
         # -------------------------------
@@ -106,7 +107,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
                         
 
     def serve(self, port=50052):                                                                                    # ✅
-        server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+        server = grpc.server(futures.ThreadPoolExecutor(max_workers=2))
         communication.add_ChordNetworkCommunicationServicer_to_server(self, server)
         server.add_insecure_port("[::]:" + str(port))
         server.start()
@@ -169,12 +170,15 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
     def RetakePendingOperation(self, node_reference, operation, operation_id):                                      # ✅
         print("🔗 Entre en RetakePendingOperation")
 
-        (pending_op, info) = self.pending_operations.get(operation_id, (None, None))
+        # (pending_op, info) = self.pending_operations.get(operation_id, (None, None))
+        (pending_op, info) = self.pending_operations.pop(operation_id, (None, None))
         if not pending_op or pending_op != operation:
-           print("Se solicito una operacion que no estaba pendiente")
-           self.ready_operations[operation_id] = Exception(f"Error al realizar la operacion {str(operation).casefold()}, dicha operacion que no estaba pendiente")
-           return 
-        del self.pending_operations[operation_id]
+            print("Se solicito una operacion que no estaba pendiente")
+            with self.ready_operations_locker:
+                self.ready_operations[operation_id] = Exception(f"Error al realizar la operacion {str(operation).casefold()}, dicha operacion que no estaba pendiente")
+            return 
+        # del self.pending_operations[operation_id]
+
         # NOTE Aqui no hay que esperar nada porque ya el hilo principal espera por la respuesta
         # final del servidor.
         # Al recibir la respuesta se sigue el proceso no como cualquier otro metodo iterativo
@@ -194,27 +198,27 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         #     print(e)
 
         results = self.chord_client.RetakePendingOperation(node_reference, operation, info)
-        self.ready_operations[operation_id] = results
-        print(f"pase el envio y estoy en RetakePendingOperation de nuevo: {results}")
-    def PushPendingOperation(self, operation_id, operation, info, function_to_apply_to_results = print):            # ✅
+        # print(f"results(ya se recepciono en el servidor recepcionista): {results}")
+        with self.ready_operations_locker:
+            self.ready_operations[operation_id] = results
+        # print(f"pase el envio y estoy en RetakePendingOperation de nuevo: {results}")
+    def PushPendingOperation(self, operation_id, operation, info):                                                  # ✅
         print("🔗 Entre en push_pending_operation")
 
         self.pending_operations[operation_id] = (operation, info)
         def wait_for_results():
-            self.check_for_updates_func(operation_id)
+            results_ready = self.check_for_updates_func(operation_id)
 
-            results = self.ready_operations.get(operation_id, None)
-            if not results:
+            # results = self.ready_operations.get(operation_id, None)
+            if not results_ready:
                 print("No se recupero el resultado de la operacion en el tiempo esperado")
                 return
-            del self.ready_operations[operation_id]
+            # del self.ready_operations[operation_id]
             print(f"Operacion Realizada: {operation}   => Resultados: {results}")
             if function_to_apply_to_results != print:
                 function_to_apply_to_results(results)
-        checking_for_results_thread = Thread(target=wait_for_results, daemon=True)
         def start_thread():
-            checking_for_results_thread.start()
-            return checking_for_results_thread
+            ControlledThread(target=wait_for_results, name="wait_for_results")
         return start_thread
 
     def belonging_id(self, searching_id):                                                                           # ✅
@@ -331,6 +335,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
                                                             tag_list=file_tags,
                                                             location=communication_messages.FileLocation(file_hash=file_hash, 
                                                                                                             location_hash=file_location_hash))
+            # print(f"archivo recuperado: {file}")
             files_list.append(file)
         for file in recovered_files_references:
             empty_file_list = False
@@ -342,9 +347,9 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
                                                             tag_list=file_tags,
                                                             location=communication_messages.FileLocation(file_hash=file_hash, 
                                                                                                             location_hash=file_location_hash))
+            # print(f"archivo recuperado: {file}")
             files_list.append(file)
 
-        print(f"archivos recuperados: {recovered_files} || {recovered_files_references}")
         if empty_file_list:
             print("No se encontraron archivos")
             return communication_messages.FileGeneralInfoss(files_general_info=[])
