@@ -179,7 +179,8 @@ class ClientAPIServer(communication.ClientAPIServicer):
         operation_id = int(sha1(random_selected_tag.encode("utf-8")).hexdigest(), 16) % 1000000
         random_selected_tag_hash = int(sha1(random_selected_tag.encode("utf-8")).hexdigest(), 16) % (2**self.chord_server.nodes_count)
 
-        wait_for_results = self.PushPendingOperation(operation_id=operation_id, operation=communication_messages.ADD_FILES, info=request)
+        info = communication_messages.FilesToAddWithLocation(files=request.files, tags=request.tags, location_hash=random_selected_tag_hash)
+        wait_for_results = self.PushPendingOperation(operation_id=operation_id, operation=communication_messages.ADD_FILES, info=info)
         self.chord_client.succesor(requesting_node=self.chord_server.node_reference, node_reference=self.chord_server.next[0], searching_id=random_selected_tag_hash, requested_operation=communication_messages.ADD_FILES, operation_id=operation_id)
         results = wait_for_results()
 
