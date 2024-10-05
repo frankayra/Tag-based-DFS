@@ -81,7 +81,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
                 print(f" > No se encontraron nodos en la red: Auto-asignando id: {claiming_id}")
                 self.node_reference.id = claiming_id
             else:
-                time.sleep(random.random()*10)
+                time.sleep(random.random()*5)
                 if not self.entrance_resolved:
                     for n_ip in nodes_ips: print(f"Nodo descubierto: {n_ip}")
                     info = communication_messages.NodeEntranceRequest(new_node_reference=self.node_reference.grpc_format, claiming_id=claiming_id)
