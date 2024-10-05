@@ -1,15 +1,21 @@
-version: '3'
-services:
-  ds-server:
-    image: ds-centralized-server
-    container_name: ds-centralized-server-container
-    ports:
-      - "50051:50051"
+version: '3.8'
 
-  ds-client:
-    image: ds-client
-    container_name: ds-client-container
-    stdin_open: true  # Habilitar el uso de la terminal interactiva
+services:
+  ds-server-principal:
+    build: .
+    ports:
+      - "8000:50051"  # Ajusta el puerto según tu aplicación
+    volumes:
+      - ./Server:/usr/src/app  # Monta el directorio de la aplicación
+      - /usr/src/app/__pycache__  # Evita que el directorio __pycache__ del host sobrescriba el del contenedor
+    environment:
+      - PYTHONUNBUFFERED=1  # Opcional: mejora la salida de logs
     tty: true         # Asignar una terminal para la interacción
-    depends_on:
-      - ds-server
+  ds-server:
+    build: .
+    volumes:
+      - ./Server:/usr/src/app  # Monta el directorio de la aplicación
+      - /usr/src/app/__pycache__  # Evita que el directorio __pycache__ del host sobrescriba el del contenedor
+    environment:
+      - PYTHONUNBUFFERED=1  # Opcional: mejora la salida de logs
+    tty: true         # Asignar una terminal para la interacción
