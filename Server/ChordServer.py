@@ -648,7 +648,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
                 gap = self.gap(self.next[i-1].id, self.next[i].id)
                 if gap > 1:
                     next_node = self.next[i]
-                    new_claiming_id = self.apply_offset(next_node.id, int(gap/2))
+                    new_claiming_id = self.apply_offset(self.next[i-1].id, int(gap/2))
                     break
 
         # Redireccionando la operacion de 'node_entrance_request' para el siguiente nodo

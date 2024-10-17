@@ -165,7 +165,6 @@ class ChordClient:
         print(f"📡 solicitud a {node_reference.ip}:{node_reference.port} de node_entrance_request")
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
-            print("hi")
             return stub.node_entrance_request(info)
 
     def i_am_your_next(self, node_reference, info): 

@@ -115,33 +115,33 @@ if __name__ == '__main__':
             
             
             ######################  Info Version larga  ######################
-            # print(f"mi id es: {api_server.chord_server.node_reference.id}")
-            # print("proximos: ", [f"{n.id}--> {n.ip}:{n.port} " for n in api_server.chord_server.next])
-            # if api_server.chord_server.prev:
-            #     print("anterior: ", f"{api_server.chord_server.prev.id}--> {api_server.chord_server.prev.ip}:{api_server.chord_server.prev.port}")
-            # print("Finger Table: ")
-            # for n in api_server.chord_server.finger_table:
-            #     print(f"  | ({n.id})")
-            # # print("   ⊢−-------------") # ◟∟−∸⊢⨽⫠_
-            # print(f"   ◟ _______________") # ◟∟−∸⊢⨽⫠_
-            # print(f"Hilos activos: {threading.active_count()}/{ControlledThread.max_threads}")
-            # for hilo in ControlledThread.active_threads.keys():
-            #     print(f" |-> {hilo}")
-            # print("----------------------")
-            # time.sleep(20)  # Mantener el hilo principal activo
+            print(f"mi id es: {api_server.chord_server.node_reference.id}")
+            print("proximos: ", [f"{n.id}--> {n.ip}:{n.port} " for n in api_server.chord_server.next])
+            if api_server.chord_server.prev:
+                print("anterior: ", f"{api_server.chord_server.prev.id}--> {api_server.chord_server.prev.ip}:{api_server.chord_server.prev.port}")
+            print("Finger Table: ")
+            for n in api_server.chord_server.finger_table:
+                print(f"  | ({n.id})")
+            # print("   ⊢−-------------") # ◟∟−∸⊢⨽⫠_
+            print(f"   ◟ _______________") # ◟∟−∸⊢⨽⫠_
+            print(f"Hilos activos: {threading.active_count()}/{ControlledThread.max_threads}")
+            for hilo in ControlledThread.active_threads.keys():
+                print(f" |-> {hilo}")
+            print("----------------------")
+            time.sleep(20)  # Mantener el hilo principal activo
 
             
             ######################  Info Version corta  ######################
-            print(f"✨ Updates --------- id={api_server.chord_server.node_reference.id} ")
-            print("next: ", end="")
-            for n in api_server.chord_server.next:
-                print(f"({n.id})", end=" ")
-            print(f"prev: {api_server.chord_server.prev.id if api_server.chord_server.prev else "-"}")
-            print("Finger: ", end="")
-            for n in api_server.chord_server.finger_table:
-                print(f"({n.id})", end=" ")
-            print()
-            print(f"   ⊢−------------- H: {threading.active_count()}/{ControlledThread.max_threads} ") # ◟∟−∸⊢⨽⫠_
+            # print(f"✨ Updates --------- id={api_server.chord_server.node_reference.id} ")
+            # print("next: ", end="")
+            # for n in api_server.chord_server.next:
+            #     print(f"({n.id})", end=" ")
+            # print(f"prev: {api_server.chord_server.prev.id if api_server.chord_server.prev else "-"}")
+            # print("Finger: ", end="")
+            # for n in api_server.chord_server.finger_table:
+            #     print(f"({n.id})", end=" ")
+            # print()
+            # print(f"   ⊢−------------- H: {threading.active_count()}/{ControlledThread.max_threads} ") # ◟∟−∸⊢⨽⫠_
             time.sleep(20)  # Mantener el hilo principal activo
     except KeyboardInterrupt:
         print("Interrupción recibida. Saliendo del programa.")
