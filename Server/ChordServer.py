@@ -25,7 +25,7 @@ from controlled_thread import ControlledThread
 
 
 class ChordServer(communication.ChordNetworkCommunicationServicer):
-    def __init__(self, check_for_updates_func, ip: str, port:int = 50052, nodes_count:int = 3, replication_factor = 3, next_alive_check_length = 3, docker_network_name = 'ds_network', server_to_request_entrance:ChordNodeReference = None):
+    def __init__(self, check_for_updates_func, ip: str, port:int = 50052, nodes_count:int = 3, replication_factor = 3, next_alive_check_length = 3, docker_network_name = 'tag-based-dfs_ds-network', server_to_request_entrance:ChordNodeReference = None):
         self.next:list[ChordNodeReference] = []
         self.prev:ChordNodeReference = None
         self.finger_table:list[ChordNodeReference] = []
@@ -53,6 +53,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         # Resolucion del id
         # -------------------------------
         self.node_reference = ChordNodeReference(ip, port, -1)
+        self.entrance_resolved = False
         # Se inicia el server antes de resolver la id por razones obvias, se necesitan recibir cosas desde el servidor que se le solicito entrada al anillo.
         ControlledThread(target=self.serve, args=(port,), name="ChordServer serve")
         claiming_id = random.randint(0, (2**nodes_count)-1)
@@ -80,30 +81,32 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
                 print(f" > No se encontraron nodos en la red: Auto-asignando id: {claiming_id}")
                 self.node_reference.id = claiming_id
             else:
-                for n_ip in nodes_ips: print(f"Nodo descubierto: {n_ip}")
-                info = communication_messages.NodeEntranceRequest(new_node_reference=self.node_reference.grpc_format, claiming_id=claiming_id)
-                catched = False
-                for n_ip in nodes_ips:
-                    server_to_request_entrance = ChordNodeReference(ip=n_ip, port=50052, id=-1)
-                    try:
-                        self.chord_client.node_entrance_request(server_to_request_entrance, info)
-                        starting_time = time.time()
-                        while True:
-                            print("Esperando por respuesta para entrada a la red...")
-                            if self.node_reference.id != -1:
-                                catched = True
+                time.sleep(random.random()*5)
+                if not self.entrance_resolved:
+                    for n_ip in nodes_ips: print(f"Nodo descubierto: {n_ip}")
+                    info = communication_messages.NodeEntranceRequest(new_node_reference=self.node_reference.grpc_format, claiming_id=claiming_id)
+                    catched = False
+                    for n_ip in nodes_ips:
+                        server_to_request_entrance = ChordNodeReference(ip=n_ip, port=50052, id=-1)
+                        try:
+                            self.chord_client.node_entrance_request(server_to_request_entrance, info)
+                            starting_time = time.time()
+                            while True:
+                                print("Esperando por respuesta para entrada a la red...")
+                                if self.node_reference.id != -1:
+                                    catched = True
+                                    break
+                                time.sleep(1)
+                                if time.time() - starting_time > 4:
+                                    break
+                            if catched: 
+                                print(f" > id conseguido: {self.node_reference.id} ✅")
                                 break
-                            time.sleep(1)
-                            if time.time() - starting_time > 4:
-                                break
-                        if catched: 
-                            print(f" > id conseguido: {self.node_reference.id} ✅")
-                            break
-                    except:
-                        continue
-                if not catched:
-                    self.node_reference.id = claiming_id
-                    print(f" > Ninguno de los nodos descubiertos respondio validamente: Auto-asignando id: {claiming_id}")
+                        except:
+                            continue
+                    if not catched:
+                        self.node_reference.id = claiming_id
+                        print(f" > Ninguno de los nodos descubiertos respondio validamente: Auto-asignando id: {claiming_id}")
                         
 
     def serve(self, port=50052):                                                                                    # ✅
@@ -113,9 +116,10 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         server.start()
         print("Chord Server iniciado, escuchando en el puerto " + str(port))
         server.wait_for_termination()
-    def discover_nodes(self, network_name='ds_network'):
+    def discover_nodes(self, network_name='bridge'):
         try:
-            client = docker.DockerClient(base_url='tcp://localhost:2375')
+            docker_host = os.getenv('DOCKER_HOST', 'tcp://host.docker.internal:2375')
+            client = docker.DockerClient(base_url=docker_host)
         except docker.errors.DockerException as e1:
             try:
                 client = docker.DockerClient(base_url='tcp://host.docker.internal:2375')
@@ -128,13 +132,35 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
                     print(f"---------Error 1: {e1}")
                     print(f"\n ---------Error 2: {e2}")
                     print(f"\n ---------Error 3: {e3}")
-        network = client.networks.get(network_name)
-        containers = network.attrs['Containers']
+        try:
+            network = client.networks.get(network_name)
+            containers = network.attrs['Containers']
+
+            # Obtener la IP del contenedor actual
+            current_container_name = socket.gethostname()
+            current_container = client.containers.get(current_container_name)
+            current_container_ip = None
+            if network_name in current_container.attrs['NetworkSettings']['Networks']:
+                current_container_ip = current_container.attrs['NetworkSettings']['Networks'][network_name]['IPAddress']
+        except Exception as e:
+            print("La red especificada no se encontro. Estas son las redes disponibles")
+            for net in client.networks.list():
+                print(f"------{net.name}------")
+                containers = net.attrs['Containers']
+                for container_id, container_info in containers.items():
+                    print(f"ID: {container_id}")
+                    print(f"Nombre: {container_info['Name']}")
+                    print(f"IP: {container_info['IPv4Address']}")
+                    print("-" * 20)
+
+            print(f"Error encontrando la red: {e}")
+            return []
 
         nodes = []
         for container_id, container_info in containers.items():
             container_ip = container_info['IPv4Address'].split('/')[0]  # Obtener solo la IP
-            nodes.append(container_ip)
+            if container_ip != current_container_ip:
+                nodes.append(container_ip)
 
         return nodes
     def Manage_Heartbeats_AliveRequests(self):
@@ -592,7 +618,9 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
 # ----------------------------------
     def node_entrance_request(self, request, context):                                                              # ✅
         print("🔹 Entre en node_entrance_request")
-        
+        if not self.entrance_resolved:
+            self.entrance_resolved = True
+            self.node_reference.id = random.randint(0, (2**self.nodes_count)-1)
         # Verificando si se puede dar de alta al nuevo nodo aqui mismo.
         # ----------------------------------
         # Verificando si el nodo esta dentro de los ids que el nodo actual maneja y este puede ponerlo como su anterior, integrandolo a la red.
@@ -620,7 +648,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
                 gap = self.gap(self.next[i-1].id, self.next[i].id)
                 if gap > 1:
                     next_node = self.next[i]
-                    new_claiming_id = self.apply_offset(next_node.id, int(gap/2))
+                    new_claiming_id = self.apply_offset(self.next[i-1].id, int(gap/2))
                     break
 
         # Redireccionando la operacion de 'node_entrance_request' para el siguiente nodo

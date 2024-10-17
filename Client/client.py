@@ -1,8 +1,6 @@
 
 import time
 import os
-# import sys
-# sys.path.append('../')
 import asyncio
 from pathlib import Path
 
@@ -151,9 +149,6 @@ class Cache:
 if __name__ == '__main__':
     print("---------------------------------------------- Nueva ejecucion")
     asyncio.run(RunTerminalClient())
-    # actions('add', ['Dockerfile'], ['archivo', 'docker', 'proyecto'])
-    # actions('list', ['archivo'], [])
-    pass
 
 
 

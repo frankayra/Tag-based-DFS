@@ -1,0 +1,31 @@
+@REM docker network create ds_network
+@REM docker run -it --name server1 -d --network ds_network ds-server
+@REM docker exec -it server1 /bin/bash
+@REM docker run -it --name server2 -d --network ds_network ds-server
+
+
+
+
+
+DOCKER-COMPOSE
+------- EJECUTAR ESTO EN EL DIRECTORIO RAIZ
+docker-compose up --build --scale ds-server=2
+
+------- EJECUTAR ESTO EN CADA UNA DE LAS CONSOLAS PARA SEPARAR LOS LOGS
+docker-compose logs -f nombre_del_servicio
+
+
+
+
+DOCKERFILES
+------- CREAR LA RED
+docker network create tag-based-dfs_ds-network
+docker build -t ds-server .
+docker run --name ds-server-principal -p 50051:50051 -it --network tag-based-dfs_ds-network ds-server
+docker run --name ds-server-1 -it --network tag-based-dfs_ds-network ds-server
+docker run --name ds-server-2 -it --network tag-based-dfs_ds-network ds-server
+
+
+
+
+
