@@ -5,7 +5,7 @@ class ControlledThread:
     active_threads = {}
     # active_threads_count = 0
     _being_used = False
-    max_threads = 9
+    max_threads = 100
     def __init__(self, target, args:tuple = (), name:str=None, wait_time = 3):
         starting_time = time.time()
 
@@ -25,7 +25,7 @@ class ControlledThread:
         try:
             method(*args)
         except Exception as e:
-            print(f"Hubo un error no controlado en el ControlledThread:    [{e}]")
+            print(f"Hubo un error no controlado en el ControlledThread '{name}':    [{e}]")
         finally:
             del ControlledThread.active_threads[name]
             # ControlledThread.active_threads_count -=1

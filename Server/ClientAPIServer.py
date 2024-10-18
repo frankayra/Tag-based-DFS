@@ -52,7 +52,7 @@ class ClientAPIServer(communication.ClientAPIServicer):
     def check_for_ready_operation(self, id):
         result = None
         start_time = time.time()
-        waiting_time = 3
+        waiting_time = 4
         while(True):
             time.sleep(1)
             # if time.time()-start_time % 2 == 0: print("Esperando resultados....")

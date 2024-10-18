@@ -2,12 +2,15 @@ import time
 import random
 from hashlib import sha1
 import socket
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 from concurrent import futures
 from threading import Thread
 import threading
 import os
 import platform
+import atexit
+from multiprocessing import Manager, Queue
+import asyncio
 
 
 import docker
@@ -73,13 +76,17 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
                 # else:
                 #     os.system('clear')
             print(f" > id conseguido: {self.node_reference.id} ✅")
+            self.entrance_resolved = True
+
         elif ip == "localhost":
             self.node_reference.id = claiming_id
+            self.entrance_resolved = True
         else: 
             nodes_ips = self.discover_nodes(network_name=docker_network_name)
             if len(nodes_ips) == 0:
-                print(f" > No se encontraron nodos en la red: Auto-asignando id: {claiming_id}")
+                print(f" > No se encontraron nodos en la red: Auto-asignando id: {claiming_id} ✅")
                 self.node_reference.id = claiming_id
+                self.entrance_resolved = True
             else:
                 time.sleep(random.random()*5)
                 if not self.entrance_resolved:
@@ -101,13 +108,18 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
                                     break
                             if catched: 
                                 print(f" > id conseguido: {self.node_reference.id} ✅")
+                                self.entrance_resolved = True
                                 break
                         except:
                             continue
                     if not catched:
                         self.node_reference.id = claiming_id
-                        print(f" > Ninguno de los nodos descubiertos respondio validamente: Auto-asignando id: {claiming_id}")
-                        
+                        print(f" > Ninguno de los nodos descubiertos respondio validamente: Auto-asignando id: {claiming_id} ✅")
+                        self.entrance_resolved = True
+
+        ControlledThread(target=self.Manage_Heartbeats_AliveRequests, name="live_check")
+        self.process_executor = ProcessPoolExecutor(max_workers=3)
+        atexit.register(lambda: self.process_executor.shutdown(wait=True))
 
     def serve(self, port=50052):                                                                                    # ✅
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=2))
@@ -165,34 +177,57 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         return nodes
     def Manage_Heartbeats_AliveRequests(self):
         heat_factor = 1
-        while True:
-            time.sleep(10 / heat_factor)
-            no_problem = False
-            for i, node in enumerate(self.next):
-                if no_problem: break
-                for _ in range(3):
-                    try:
-                        response = self.chord_client.alive_request(node)
-                        if i == 0:
-                            if not response.any_changes:
-                                no_problem = True
+        async def alive_request():
+            print("Alive check started")
+            while True:
+                await asyncio.sleep(10 / heat_factor)
+                no_problem = False
+                for i, node in enumerate(self.next):
+                    if no_problem: break
+                    for _ in range(3):
+                        try:
+                            response = self.chord_client.alive_request(node)
+                            if i == 0:
+                                if not response.any_changes:
+                                    no_problem = True
+                                    break
+                                print("Actualizando lista de next...")
+                                assert response.HasField('next_nodes_list')
+                                self.next.clear()
+                                for node in response.next_nodes_list.references:
+                                    self.next.append(ChordNodeReference(id=node.id, ip=node.ip, port=node.port))
+                                self.any_changes_in_next_list = True
                                 break
-                            assert response.HasField('next_nodes_list')
+                            print("Se detecto un nodo que no responde, intentando recuperar datos...")
+                            new_next_list = self.chord_client.send_me_your_next_list(node)
+                            print("Actualizando lista de next...")
                             self.next.clear()
-                            for node in response.next_nodes_list:
-                                self.next.append(node)
+                            for n in new_next_list.references:
+                                self.next.append(ChordNodeReference(id=n.id, ip=n.ip, port=n.port))
+                            self.chord_client.i_am_your_prev(node, self.node_reference.grpc_format)
                             self.any_changes_in_next_list = True
+                            no_problem = True
                             break
-
-                        new_next_list = self.chord_client.send_me_your_next_list(node)
-                        self.next.clear()
-                        for node in response.references:
-                            self.next.append(node)
-                        self.any_changes_in_next_list = True
-                        break
-                    except grpc.RpcError: 
-                        time.sleep(random.randint(1, 3))
-
+                        except grpc.RpcError: 
+                            # time.sleep(random.randint(1, 3)/heat_factor)
+                            await asyncio.sleep(random.randint(1, 3)/heat_factor)
+        async def heartbeat():
+            print("Heartbeat signals started")
+            while True:
+                await asyncio.sleep(10 / heat_factor)
+                nodes_set = set()
+                for clieque, nodes in self.replication_forest:
+                    nodes_set.update(nodes)
+                for node in nodes_set:
+                    for _ in range(2):
+                        try:
+                            self.chord_client.heartbeat(node, self.node_reference.grpc_format)
+                            break
+                        except grpc.RpcError:
+                            await asyncio.sleep(1)
+        async def run_em():
+            await asyncio.gather(alive_request(), heartbeat())
+        asyncio.run(run_em())
     def RetakePendingOperation(self, node_reference, operation, operation_id):                                      # ✅
         print("🔗 Entre en RetakePendingOperation")
 
@@ -238,14 +273,14 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         def wait_for_results():
             results_ready = self.check_for_updates_func(operation_id)
 
-            # results = self.ready_operations.get(operation_id, None)
+            results = self.ready_operations.get(operation_id, None)
             if not results_ready:
-                print("No se recupero el resultado de la operacion en el tiempo esperado")
+                print(f"No se recupero el resultado de la operacion '{operation}' en el tiempo esperado")
                 return
             # del self.ready_operations[operation_id]
             print(f"Operacion Realizada: {operation}   => Resultados: {results}")
-            if function_to_apply_to_results != print:
-                function_to_apply_to_results(results)
+            # if function_to_apply_to_results != print:
+            #     function_to_apply_to_results(results)
         def start_thread():
             ControlledThread(target=wait_for_results, name="wait_for_results")
         return start_thread
@@ -291,8 +326,8 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         if self.belonging_id(request.searching_id):
             # HACK Esto con el hilo asi no estoy del todo seguro que funciona. 
             requesting_node = ChordNodeReference(ip=request.requesting_node.ip, port=request.requesting_node.port, id=request.requesting_node.id)
-            ControlledThread(target=self.chord_client.proceed_with_operation, args=(self.node_reference, requesting_node, request.searching_id, request.requested_operation, request.operation_id), name=f"procced_with_operation a: ({requesting_node.id}) -> {requesting_node.ip}:{requesting_node.port}")
-            
+            # ControlledThread(target=self.chord_client.proceed_with_operation, args=(self.node_reference, requesting_node, request.searching_id, request.requested_operation, request.operation_id), name=f"procced_with_operation a: ({requesting_node.id}) -> {requesting_node.ip}:{requesting_node.port}")
+            self.process_executor.submit(self.chord_client.proceed_with_operation, self.node_reference, requesting_node, request.searching_id, request.requested_operation, request.operation_id)
             return communication_messages.OperationReceived(success=True)
             
         # print("succesor: El id no pertenece a este nodo")
@@ -322,14 +357,16 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         if not next_node:
             if len(self.finger_table) == 0: 
                 requesting_node = ChordNodeReference(ip=request.requesting_node.ip, port=request.requesting_node.port, id=request.requesting_node.id)
-                ControlledThread(target=self.chord_client.proceed_with_operation, args=(self.node_reference, requesting_node, request.searching_id, request.requested_operation, request.operation_id), name=f"procced_with_operation a: ({requesting_node.id}) -> {requesting_node.ip}:{requesting_node.port}")
+                # ControlledThread(target=self.chord_client.proceed_with_operation, args=(self.node_reference, requesting_node, request.searching_id, request.requested_operation, request.operation_id), name=f"procced_with_operation a: ({requesting_node.id}) -> {requesting_node.ip}:{requesting_node.port}")
+                self.process_executor.submit(self.chord_client.proceed_with_operation, self.node_reference, requesting_node, request.searching_id, request.requested_operation, request.operation_id)
                 return communication_messages.OperationReceived(success=True)
             next_node = self.finger_table[0] # Esto garantiza que pueda haber salto cuando el nodo siguiente al actual es el nodo responsable del id que se busca ya que este ultimo por lo tanto tiene un id mayor y no sera escogido para ser el siguiente por el algoritmo.
 
         address = next_node.uri_address
         # HACK Esto con el hilo asi no estoy del todo seguro que funciona. 
         # self.chord_client.succesor(next_node, request.searching_id, request.requested_operation, request.operation_id)
-        ControlledThread(target=self.chord_client.succesor, args=(requesting_node, next_node, request.searching_id, request.requested_operation, request.operation_id), name=f"sucesor a: ({next_node.id}) -> {next_node.ip}:{next_node.port}")
+        # ControlledThread(target=self.chord_client.succesor, args=(requesting_node, next_node, request.searching_id, request.requested_operation, request.operation_id), name=f"sucesor a: ({next_node.id}) -> {next_node.ip}:{next_node.port}")
+        self.process_executor.submit(self.chord_client.succesor, requesting_node, next_node, request.searching_id, request.requested_operation, request.operation_id)
         return communication_messages.OperationReceived(success=True)
     def proceed_with_operation(self, request, context):                                                             # ✅
         print("🔹 Entre en proceed_with_operation")
@@ -734,7 +771,15 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
 
 # Salida de un nodo de la red
 # ----------------------------------
-    def i_am_your_prev(self, request, context): pass
+    def i_am_your_prev(self, request, context):
+        print("🔹 Entre en i_am_your_prev")
+        try:
+            response = self.chord_client.alive_request(self.prev)
+            print(f"El nodo ({request.id}) esta solicitando ser mi prev, pero ({self.prev.id}) aun esta vivo)")
+        except grpc.RpcError:
+            self.prev = ChordNodeReference(ip=request.ip, port=request.port, id=request.id)
+            print(f"El nodo ({request.id}) es mi nuevo prev")
+        return communication_messages.OperationReceived(success=True)
 
 
 # Actualizar finger tables

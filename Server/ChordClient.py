@@ -149,10 +149,10 @@ class ChordClient:
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
             return stub.heartbeat(info)
-    def alive_request(self, node_reference, info): 
+    def alive_request(self, node_reference): 
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
-            return stub.alive_request(info)
+            return stub.alive_request(communication_messages.Empty())
     def unreplicate(self, node_reference, info): 
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
