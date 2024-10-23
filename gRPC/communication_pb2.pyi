@@ -218,12 +218,14 @@ class FilesToReplicate(_message.Message):
     def __init__(self, files: _Optional[_Union[FilesToAdd, _Mapping]] = ..., location_hash: _Optional[int] = ..., main_replica_node_reference: _Optional[_Union[ChordNodeReference, _Mapping]] = ...) -> None: ...
 
 class RawDatabases(_message.Message):
-    __slots__ = ("db_phisical", "db_references")
+    __slots__ = ("db_phisical", "db_references", "main_replica_node_reference")
     DB_PHISICAL_FIELD_NUMBER: _ClassVar[int]
     DB_REFERENCES_FIELD_NUMBER: _ClassVar[int]
+    MAIN_REPLICA_NODE_REFERENCE_FIELD_NUMBER: _ClassVar[int]
     db_phisical: bytes
     db_references: bytes
-    def __init__(self, db_phisical: _Optional[bytes] = ..., db_references: _Optional[bytes] = ...) -> None: ...
+    main_replica_node_reference: ChordNodeReference
+    def __init__(self, db_phisical: _Optional[bytes] = ..., db_references: _Optional[bytes] = ..., main_replica_node_reference: _Optional[_Union[ChordNodeReference, _Mapping]] = ...) -> None: ...
 
 class FilesToUpdateRequest(_message.Message):
     __slots__ = ("args", "node_reference")

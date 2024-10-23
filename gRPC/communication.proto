@@ -175,6 +175,7 @@ message FilesToReplicate {
 message RawDatabases {
     bytes db_phisical = 1;
     bytes db_references = 2;
+    ChordNodeReference main_replica_node_reference = 3;
 }
 message FilesToUpdateRequest {
     UpdateRequestArguments args = 1;

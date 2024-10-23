@@ -154,7 +154,23 @@ class File_Tag_DB:
                                                                         .where(FileTag.file == file_hash)
                                                                         .where(Tag.name.in_(tags)))]
             FileTag.delete().where(FileTag.id.in_(filtered_filetags_to_delete)).execute()
-                
+    def close(self):
+        self.DB.close()
+    def JoinDatabase(DB):
+        for file in DB.File.select():
+            self.SaveFile(file.name, file.content, file.location_hash, [tag.name for tag in file.tags])
+
+
+
+
+
+# ------------------- Referencias -------------------
+            
+            
+            
+            
+            
+            
 class Files_References_DB(File_Tag_DB):
     def __init__(self, db_name:str):
         file_tag_DB = get_File_Reference_DB(db_name=db_name)
@@ -214,15 +230,7 @@ class Files_References_DB(File_Tag_DB):
 
 
 
-    
-
-
-
-
-
-
-    #################### Metodos no debuggeados #####################
-
+#################### Metodos no debuggeados #####################
 
     def RecoverFilesNames_ByTagQuery(self, tag_query, arg2=None):
         """Obtener los archivos con TODOS los tags de la lista de tags: tag_query"""
@@ -305,3 +313,9 @@ class Files_References_DB(File_Tag_DB):
                                                                         .where(Tag.name.in_(tags)))]
             FileTag.delete().where(FileTag.id.in_(filtered_filetags_to_delete)).execute()
                 
+    def close(self):
+        self.DB.close()
+
+    def JoinDatabase(DB):
+        for file in DB.File.select():
+            self.SaveFile(file.name, file.file_hash, file.location_hash, [tag.name for tag in file.tags])
