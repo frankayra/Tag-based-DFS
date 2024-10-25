@@ -2,15 +2,18 @@ from .DB import get_File_Tag_DB, get_File_Reference_DB
 from peewee import fn
 from peewee import *
 from hashlib import sha1
+import os
 
 
 class File_Tag_DB:
-    def __init__(self, db_name:str):
+    def __init__(self, db_name:str, permanent_live=False):
         file_tag_DB = get_File_Tag_DB(db_name=db_name)
         self.DB = file_tag_DB[0]
         self.File = file_tag_DB[1]
         self.Tag = file_tag_DB[2]
         self.FileTag = file_tag_DB[3]
+        self.name = db_name
+        self.permanent_live = permanent_live
     
     def AddFiles(self, files, tags, location_hash):
         message = "\n\n"
@@ -154,11 +157,28 @@ class File_Tag_DB:
                                                                         .where(FileTag.file == file_hash)
                                                                         .where(Tag.name.in_(tags)))]
             FileTag.delete().where(FileTag.id.in_(filtered_filetags_to_delete)).execute()
-    def close(self):
-        self.DB.close()
     def JoinDatabase(DB):
         for file in DB.File.select():
             self.SaveFile(file.name, file.content, file.location_hash, [tag.name for tag in file.tags])
+            
+    def close(self):
+        if not self.DB.is_closed():
+            self.DB.close()
+            try:
+                os.remove(self.name + ".db")
+                print(f"Se cerro la base de datos '{self.name}.db'")
+            except PermissionError:
+                print(f"La base de datos '{self.name}.db' se cerro, pero no se pudo eliminar porque habia otra instancia que la estaba usando.")
+        else: print(f"La base de datos '{self.name}.db' ya estaba cerrada")
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if not self.DB.is_closed(): self.close()
+    def __del__(self):
+        if not self.DB.is_closed():
+            if not self.permanent_live: self.close()
+            else: self.DB.close()
 
 
 
@@ -172,12 +192,14 @@ class File_Tag_DB:
             
             
 class Files_References_DB(File_Tag_DB):
-    def __init__(self, db_name:str):
+    def __init__(self, db_name:str, permanent_live=False):
         file_tag_DB = get_File_Reference_DB(db_name=db_name)
         self.DB = file_tag_DB[0]
         self.File = file_tag_DB[1]
         self.Tag = file_tag_DB[2]
         self.FileTag = file_tag_DB[3]
+        self.name = db_name
+        self.permanent_live = permanent_live
 
     def AddFiles(self, files, tags, location_hash):
         message = "\n\n"
@@ -313,9 +335,26 @@ class Files_References_DB(File_Tag_DB):
                                                                         .where(Tag.name.in_(tags)))]
             FileTag.delete().where(FileTag.id.in_(filtered_filetags_to_delete)).execute()
                 
-    def close(self):
-        self.DB.close()
 
     def JoinDatabase(DB):
         for file in DB.File.select():
             self.SaveFile(file.name, file.file_hash, file.location_hash, [tag.name for tag in file.tags])
+    
+    def close(self):
+        if not self.DB.is_closed():
+            self.DB.close()
+            print(f"Se cerro la base de datos '{self.name}.db'")
+            try:
+                os.remove(self.name + ".db")
+            except PermissionError:
+                print(f"La base de datos '{self.name}.db' se cerro, pero no se pudo eliminar porque habia otra instancia que la estaba usando.")
+        else: print(f"La base de datos '{self.name}.db' ya estaba cerrada")
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if not self.DB.is_closed(): self.close()
+    def __del__(self):
+        if not self.DB.is_closed():
+            if not self.permanent_live: self.close()
+            else: self.DB.close()

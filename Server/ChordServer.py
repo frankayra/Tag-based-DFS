@@ -11,6 +11,7 @@ import platform
 import atexit
 from multiprocessing import Manager, Queue
 import asyncio
+import pickle
 
 
 import docker
@@ -438,20 +439,30 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         """RawDatabases {db_phisical: bytes, db_references: bytes, main_replica_node_reference: ChordNodeReference {...}}    =>    OperationResult {success: bool, message: string}"""
         print("🔹 Entre en send_raw_database_replica")
         main_replica_node_reference = ChordNodeReference(ip=request.main_replica_node_reference.ip, port=request.main_replica_node_reference.port, id=request.main_replica_node_reference.id)
-        if not self.replication_forest[main_replica_node_reference]:
-            self.replication_forest[main_replica_node_reference] = set()
-            self.db_replicas[main_replica_node_reference] = (File_Tag_DB(f"phisical_storage-{main_replica_node_reference.id}-{self.node_reference.id}")
-                                                            , Files_References_DB(f"references-{main_replica_node_reference.id}-{self.node_reference.id}"))
-        replica_db = self.db_replicas.get(main_replica_node_reference, None)
-
+        physical_storage_name = f"phisical_storage-{main_replica_node_reference.id}-{self.node_reference.id}"
+        references_name = f"references-{main_replica_node_reference.id}-{self.node_reference.id}"
         try:
-            physical_storage_db = File_Tag_DB(request.db_phisical)
-            references_db = Files_References_DB(request.db_references)
+            converted_db = (pickle.loads(request.db_phisical), pickle.loads(request.db_references))
+            with open(physical_storage_name, "wb") as file:
+                file.write(converted_db[0])
+            with open(references_name, "wb") as file:
+                file.write(converted_db[1])
         except Exception as e:
             print("Error la conversion de bytes a clase de la base de datos")
             return communication_messages.OperationResult(success=False, message="Error al convertir la replica solicitada")
-        self.db_replicas[main_replica_node_reference][0].JoinDatabase(physical_storage_db)
-        self.db_replicas[main_replica_node_reference][1].JoinDatabase(references_db)
+
+        physical_storage_db = File_Tag_DB(physical_storage_name)
+        references_db = Files_References_DB(references_name)
+
+        if main_replica_node_reference == self.node_reference:
+            self.db_physical_files.JoinDatabase(physical_storage_db)
+            self.db_references.JoinDatabase(references_db)
+        else:
+            if not self.replication_forest[main_replica_node_reference]:
+                self.replication_forest[main_replica_node_reference] = set()
+            self.db_replicas[main_replica_node_reference][0].JoinDatabase(physical_storage_db)
+            self.db_replicas[main_replica_node_reference][1].JoinDatabase(references_db)
+            # NOTE No se añaden nodos al clique de replicacion porque ya de esto se encarga el metodo 'i_am_your_next' con la nueva lista next.
         return communication_messages.OperationResult(success=True, message="Replica recibida satisfactoriamente")
     def add_references(self, request, context): 
         """FilesReferencesToAdd {location_hash: int, files_references: FileReference[] {title: string, file_hash: int}, tags: string[]}    =>    OperationResult {success: bool, message: string}"""
@@ -732,8 +743,8 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         print("🔹 Entre en files_allotment_transfer")
         try:
             for file in request.files:
-                self.db_physical_files.SaveFile(file.file.title, file.file.content, request.location.location_hash, [tag for tag in file.tags])
-                self.db_references.SaveFile(file.file.title, file.file.file_hash, request.location.location_hash, [tag for tag in file.tags])
+                self.db_physical_files.SaveFile(file.file.title, file.file.content, request.location.location_hash, *[tag for tag in file.tags])
+                self.db_references.SaveFile(file.file.title, file.file.file_hash, request.location.location_hash, *[tag for tag in file.tags])
             return communication_messages.OperationResult(success=True, message=f"Archivos transferidos satisfactoriamente: {add_files_message}")
         except Exception as e:
             return communication_messages.OperationResult(success=False, message=f"Error al transferir los archivos solicitados: {e}")
@@ -952,9 +963,9 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
             physical_files = physical_storage.File.select().where(physical_storage.File.location_hash <= top_id)
             references_files = references.File.select().where(references.File.location_hash <= top_id)
             for file in physical_files:
-                physical_storage.SaveFile(file["name"], file["content"], file["location_hash"], file["tags"])
+                physical_storage.SaveFile(file["name"], file["content"], file["location_hash"], *file["tags"])
             for file in references_files:
-                references.SaveFile(file["name"], file["file_hash"], file["location_hash"], file["tags"])
+                references.SaveFile(file["name"], file["file_hash"], file["location_hash"], *file["tags"])
             return True
     def Join_Replica_Leader(new_leader: ChordNodeReference, old_leader: ChordNodeReference):
         print("🔗 Entre en Join_Replica_Leader")
@@ -980,12 +991,12 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         replica_references = self.db_replicas[new_main_replica_node][1]
         for file in files_to_transfer:
             result["files"].append({"name": file.name, "content": file.content, "file_hash": file.file_hash, "location_hash": file.location_hash, "tags": [tag.tag.name for tag in file.tags]})
-            replica_physical_storage.SaveFile(file_name=file["name"], file_content=file["content"], location_hash=file["location_hash"], tags=[tag.tag.name for tag in file["tags"]])
+            replica_physical_storage.SaveFile(file["name"], file["content"], file["location_hash"], *[tag.tag.name for tag in file["tags"]])
             if pop_files: file.delete_instance()
 
         for file in files_references_to_transfer:
             result["references"].append({"name": file.name, "file_hash": file.file_hash, "location_hash": file.location_hash, "tags": [tag.tag.name for tag in file.tags]})
-            replica_references.SaveFile(file_name=file["name"], file_hash=file["file_hash"], location_hash=file["location_hash"], tags=[tag.tag.name for tag in file["tags"]])
+            replica_references.SaveFile(file["name"], file["file_hash"], ile["location_hash"], *[tag.tag.name for tag in file["tags"]])
             if pop_files: file.delete_instance()
         return result
 
@@ -994,9 +1005,9 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         replication_db = self.Extract_ReplicaFiles_Fragment(main_replica_node_reference, pop_replica=True)
         if replication_db:
             for file in replication_db["files"]:
-                self.db_physical_files.SaveFile(file_name=file["name"], file_content=file["content"], location_hash=file["location_hash"], tags=[tag.tag.name for tag in file["tags"]])
+                self.db_physical_files.SaveFile(file["name"], file["content"], file["location_hash"], *[tag.tag.name for tag in file["tags"]])
             for file in replication_db["references"]:
-                self.db_references.SaveFile(file_name=file["name"], file_hash=file["file_hash"], location_hash=file["location_hash"], tags=[tag.tag.name for tag in file["tags"]])
+                self.db_references.SaveFile(file["name"], file["file_hash"], file["location_hash"], *[tag.tag.name for tag in file["tags"]])
             return True
         return False
     def Extract_ReplicaFiles_Fragment(self, main_replica_node: ChordNodeReference, pop_replica=False):
@@ -1021,7 +1032,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         result_log = ""
         if replication_db[0] and replication_db[1]:
             for file in files:
-                result_log += replication_db[0].SaveFile(file["name"], file["content"], file["location_hash"], file["tags"])
+                result_log += replication_db[0].SaveFile(file["name"], file["content"], file["location_hash"], *file["tags"])
         return result_log
 
     def AddReferences_To_Replica(self, main_replica_node: ChordNodeReference, files_references: list[dict[str, object]]):
@@ -1030,7 +1041,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         result_log = ""
         if replication_db[0] and replication_db[1]:
             for file in files_references:
-                replication_db[1].SaveFile(file["name"], file["file_hash"], file["location_hash"], file["tags"])
+                replication_db[1].SaveFile(file["name"], file["file_hash"], file["location_hash"], *file["tags"])
         return result_log
     
     def AddTags_To_Replica(self, main_replica_node:ChordNodeReference, tag_query: list[str], tag_list: list[str]):
@@ -1092,7 +1103,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         print("🔗 Entre en AddFiles_To_References")
         result_log = ""
         for file in files:
-            result_log += self.db_references.SaveFile(file["name"], file["file_hash"], file["location_hash"], file["tags"])
+            result_log += self.db_references.SaveFile(file["name"], file["file_hash"], file["location_hash"], *file["tags"])
         return result_log
     def AddTags_To_References(self, tag_query: list[str], tag_list: list[str]):
         print("🔗 Entre en AddTags_To_References")
@@ -1184,9 +1195,23 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
     def Manage_Node_Entrance(self, entrance_node_reference: ChordNodeReference, assigned_id):  # TODO Añadir las operaciones 'files_allotment_transfer', 'update_replication_clique' y 'unreplicate' y luego transferir sus archivos de almacenamiento a referencias.
         print("🔗 Entre en Manage_Node_Entrance")
 
-        # Comunicacion con el nodo entrante
-        # ----------------------------------------
-        # Enviandole al nodo entrante, la informacion de entrada a la red, como el id que se fue asignado, asi como sus nodos proximos y su nodo anterior en el anillo.
+        # -- Operaciones involucradas: 'i_am_your_next', 'update_finger_table', 'files_allotment_transfer', 'update_replication_clique', 'unreplicate'
+        # 1) Comunicar con el nodo entrante para proveerle la info de entrada a la red: el id que le fue asignado, su lista de nodos proximos y su nodo anterior. Este ultimo sera el nodo actual en caso que sea el unico en la red.
+        #   NOTE: El nodo actual no se encarga de hacer saber a 'prev' que entro un nuevo nodo que sera su proximo, ya que de esto se encargara este ultimo por su cuenta.
+        # 2) Se comienza con el proceso de actualizacion de las finger tables, comenzando por el nodo previo al actual, el cual sera el nuevo 'prev' del nodo entrante.
+        # 3) Cambiar los datos que tienen un id del que pueda ser responsable el nodo entrante, de la base de datos fisica hacia una nueva base de datos de replica creada en este paso tambien, con el nodo entrante como lider.
+        # 4) Mandar los datos correpondientes al nodo entrante.
+        # 5) Añadir el nodo entrante como lider en un nuevo clique en replication_forest con los mismos nodos que el clique del nodo actual, exluendo el nodo de mas adelante en el anillo, si ya se cumplia con el factor de replicacion.
+        # 6) Transmitir, hacia los nodos del clique del que es replica principal, este cambio de lider para los datos en el intervalo del que es responsable el nuevo nodo. Aqui incluso se hace esta operacion al nodo que se desreplicara, 
+        #   porque la operacion 'unreplicate' que se realizara mas adelante sobre este nodo, recibe la referencia de un nodo para quitarlo de sus replicas, y si aun no esta en sus replicas no podra realizar dicha operacion. Ademas de todas 
+        #   formas se tiene que hacer la operacion de recuperacion de datos en el nodo que se desreplicara (para cambiar de lider los datos), y de esta forma se sigue haciendo una sola vez y al mismo tiempo queda de manera limpia. 
+        #   En plan: 1) Cambia de lider 2) Elimina la replica del lider nuevo
+        # 7) Excluir el nodo de mas adelante del anillo de los datos mencionados en el paso anterior o sea, aplicar la operacion de desreplicacion, a menos que no se haya alcanzado el factor de replicacion aun.
+        #   NOTE: No se modifican los cliques a los que pertenece el nodo actual ya que esta responsabilidad recae en la verificacion de cambios en la lista next en el metodo 'Manage_Hearbeats_AliveRequests'.
+        #   NOTE: El nodo actual ni siquiera le envia al nodo nuevo el clique de replicacion suyo propio, este puede deducirlo por si mismo dada la lista next que se le envio en el paso 1)
+        # 8) Asignar el nodo entrante como 'prev' del nodo actual.
+
+        # 1) ----------------------------------------
         next_list = [n.grpc_format for n in self.next[:max(0, min(len(self.next), self.next_alive_check_length -1))]] # En caso de que el nodo actual no tenga a nadie en next, aqui habra una lista vacia y mas adelante se agregara el mismo para enviarselo al nodo entrante
         next_list.insert(0, self.node_reference.grpc_format)
         prev = self.prev.grpc_format if self.prev else self.node_reference.grpc_format
@@ -1196,27 +1221,27 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         response = self.chord_client.i_am_your_next(entrance_node_reference, info) # En este metodo realizamos las llamadas sincronas y secuenciales porque hace falta dar un seguimiento de las operaciones.
         if not response.success: return
 
-        # Manejo de finger tables
-        # ----------------------------------------
+        
+        # 2) ----------------------------------------
         if self.prev:
             pivot_id = self.prev.id
             interval_gap = self.gap(pivot_id, assigned_id)
             info = communication_messages.UpdateFingerTableRequest(node_reference=entrance_node_reference.grpc_format,
                                                                         updates_so_far=0, remaining_updates=self.nodes_count, interval_gap=interval_gap)
-            # HACK No se si con esto sera suficiente o correcto
             self.chord_client.update_finger_table(node_reference=self.prev, info=info)
         # else: # Si el nodo actual es el unico en la red, ahora su proximo y su anterior es el mismo, y es el nodo que esta entrando en la red.
             # self.next.append(entrance_node_reference)  # NOTE No se actualiza la lista next[] porque ya de eso se encarga update_next, que en este caso se mandaria para este mismo nodo cuando se le envie al nodo entrante la solicitud de i_am_your_next porque el nodo actual es su prev ademas de ser su sucesor
 
         entrance_node_reference.id = assigned_id
         self.prev = entrance_node_reference
-        # Le pedimos a prev que actualice su finger table, y que siga el con las actualizaciones, segun mi algoritmo de actualizacion de fingers tables.
 
 
-        # Realizando las operaciones:'files_allotment_transfer', 'update_replication_clique' y 'unreplicate'
-        # ----------------------------------------
-        # 'files_allotment_transfer'
+        # 3) ----------------------------------------
+        # if self.replication_factor > 0: # FIXME agregar esto. Si el factor de replicacion es 0, no se deberia mantener replica en el nodo actual.
         files_to_transfer = self.Change_Files_From_DB_to_Replicas(new_main_replica_node=entrance_node_reference, pop_files=True)
+
+
+        # 4) ----------------------------------------
         physical_storage_files = files_to_transfer["files"]
         files_references = files_to_transfer["references"]
         self.chord_client.files_allotment_transfer( 
@@ -1236,20 +1261,12 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
                                                     )
                                                 )
 
-        # 'unreplicate' # FIXME hay que sacar un nodo POR CADA clique
+        # 5) ----------------------------------------
         self.replication_forest[entrance_node_reference] = self.replication_forest[self.node_reference].copy()
-            
-        if len(self.replication_forest[self.node_reference]) -1 >= self.replication_factor:  # Si no se ha logrado replicar sobre la cantidad de nodos que se requiere, debemos estirar la replicacion en este punto, 
-            for main_replica, clique in self.replication_forest.items():                    # asi va creciendo la red, y con ello la replicacion, hasta lograr que cada nodo cumpla con el factor de replicacion.
-                node_to_unreplicate = self.last_node_in_replication_clique(main_replica) # NOTE Por eso se asume que el tamaño de la lista next[] es mayor o igual al factor de replicacion
-                self.chord_client.unreplicate(node_reference=node_to_unreplicate, info=main_replica.grpc_format)
-                self.replication_forest[entrance_node_reference] -= { node_to_unreplicate }
-        
-            
 
 
-        # 'update_replication_clique' (El clique nuevo es el mismo, solo añadiendo el nuevo nodo entrante y quitando el ultimo nodo del clique anterior(el de mas adelante en el anillo))
-        for node in self.replication_forest[entrance_node_reference] | {entrance_node_reference}:
+        # 6) ----------------------------------------
+        for node in self.replication_forest[entrance_node_reference]:
             info = communication_messages.UpdateReplicationCliqueRequest(
                 new_leader=entrance_node_reference.grpc_format, 
                 old_leader=self.node_reference.grpc_format, 
@@ -1261,7 +1278,21 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         
         # NOTE No es necesario actualizar la lista next de los nodos que ya estaban en la red porque ya eso se hace cuando se inserta un nodo nuevo paulatinamente con el LiveAnswer.
 
+
+
+        # 7) ----------------------------------------
+        if len(self.replication_forest[self.node_reference]) -1 >= self.replication_factor: 
+            node_to_unreplicate = self.last_node_in_replication_clique(entrance_node_reference)
+            if node_to_unreplicate == self.node_reference:
+                del self.replication_forest[entrance_node_reference]
+            else:
+                self.chord_client.unreplicate(node_reference=node_to_unreplicate, info=entrance_node_reference.grpc_format)
+                self.replication_forest[entrance_node_reference] -= { node_to_unreplicate }
+            
+
+        # 8) ----------------------------------------
         self.prev = entrance_node_reference
+
     def Manage_Node_Failure(self, failed_node: ChordNodeReference):
         """Funcion que maneja cuando un nodo falla, se encarga tanto de las replicas como de las referencias"""
         print("🔗 Entre en Manage_Node_Failure")
@@ -1277,7 +1308,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
             # Actualizando la finger table
             self.Update_FingerTable_WithNextList()
         # Actualizando las replicas y referencias
-        if failed_node in self.replication_forest.keys(): # Si el nodo que fallo era el nodo principal de uno de los cliques de replicacion presentes en el nodo actual
+        if failed_node in self.replication_forest.keys(): # Si el nodo que fallo era el nodo principal de uno de los cliques de replicacion presentes en el nodo actual, o lo que es lo mismo, QUEDABA DETRAS en el anillo
             
             # Protocolo de votacion para elegir un nuevo nodo principal
             self_responsability = True
@@ -1328,9 +1359,18 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
                             await asyncio.sleep(1/heat_factor)
                             continue
                         try:
+                            physical_db_file, references_db_file = None, None
+                            with open(files_to_replicate_db[0].name +".db", 'rb') as file:
+                                physical_db_file = file.read()
+                            with open(files_to_replicate_db[1].name +".db", 'rb') as file:
+                                references_db_file = file.read()
+
+                            physical_db_bytes = pickle.dumps(physical_db_file)
+                            references_db_bytes = pickle.dumps(references_db_file)
+
                             info = communication_messages.RawDatabases(
-                                db_phisical=bytes(files_to_replicate_db[0]), 
-                                db_references=bytes(files_to_replicate_db[1]), 
+                                db_phisical=physical_db_bytes, 
+                                db_references=references_db_bytes, 
                                 main_replica_node_reference= self.node_reference.grpc_format,
                             ) 
                             self.chord_client.send_raw_database_replica(n, info)
@@ -1379,14 +1419,21 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
             self.chord_client.replicate(new_replica_node, info)
 
             # 3)-------------------------------------
-            files_to_replicate_db = self.db_replicas.get(self.node_reference, None)
-            if files_to_replicate_db:
-                info = communication_messages.RawDatabases(
-                    db_phisical=bytes(files_to_replicate_db[0]), 
-                    db_references=bytes(files_to_replicate_db[1]), 
-                    main_replica_node_reference= self.node_reference.grpc_format,
-                ) 
-                self.chord_client.send_raw_database_replica(new_replica_node, info)
+            physical_db_file, references_db_file = None, None
+            with open("phisical_storage.db", 'rb') as file:
+                physical_db_file = file.read()
+            with open("references.db", 'rb') as file:
+                references_db_file = file.read()
+
+            physical_db_bytes = pickle.dumps(physical_db_file)
+            references_db_bytes = pickle.dumps(references_db_file)
+            
+            info = communication_messages.RawDatabases(
+                db_phisical=physical_db_bytes, 
+                db_references=references_db_bytes, 
+                main_replica_node_reference= self.node_reference.grpc_format,
+            ) 
+            self.chord_client.send_raw_database_replica(new_replica_node, info)
             
             # 4)-------------------------------------
             self.replication_forest[self.node_reference] -= {failed_node}
@@ -1426,8 +1473,8 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         # print("🔗 Entre en last_node_in_replication_clique")
         if len(self.replication_forest) or main_replica not in self.replication_forest.keys():
             return None
-        from_main_replica_to_max = sorted(filter(lambda n_i: main_replica.id < n_i.id, self.replication_forest[main_replica]), key=lambda n: n.id)
-        from_min_to_main_replica = sorted(filter(lambda n_i: main_replica.id > n_i.id, self.replication_forest[main_replica]), key=lambda n: n.id)
+        from_main_replica_to_max = sorted(filter(lambda n_i: main_replica.id < n_i.id, self.replication_forest[main_replica] | self.node_reference), key=lambda n: n.id)
+        from_min_to_main_replica = sorted(filter(lambda n_i: main_replica.id > n_i.id, self.replication_forest[main_replica] | self.node_reference), key=lambda n: n.id)
         if from_min_to_main_replica: return from_min_to_main_replica[-1]
         else: return from_main_replica_to_max[-1]
     def Recover_Network(self):
