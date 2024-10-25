@@ -49,7 +49,6 @@ class ChordClient:
             #     return None
     def proceed_with_operation(self, self_node_reference:ChordNodeReference, requesting_node_reference:ChordNodeReference, searching_id, requested_operation, operation_id):
         print(f"📡 solicitud a {requesting_node_reference.ip}:{requesting_node_reference.port} de proceed_with_operation.")
-        # if node_reference == self.node_reference:               Esto no deberia ocurrir ya que sera chequeado en metodos antes de llamar a este, en ClientAPIServer.
         with grpc.insecure_channel(requesting_node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
             request_message = communication_messages.OperationDescription(requested_operation=requested_operation, node_reference=self_node_reference.grpc_format, id_founded=searching_id, operation_id=operation_id)
@@ -99,6 +98,10 @@ class ChordClient:
                     return stub.update_finger_table(info)
                 case communication_messages.UPDATE_FINGER_TABLE_FORWARD:
                     return stub.update_finger_table_forward(info)
+
+                # Comprobaciones de red
+                case communication_messages.JUST_CHECKING:
+                    return node_reference, info
                 
 
 # CRUD

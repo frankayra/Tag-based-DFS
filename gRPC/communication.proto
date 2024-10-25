@@ -113,6 +113,7 @@ enum Operation {
     NODE_ENTRANCE_REQUEST = 14;
     UPDATE_FINGER_TABLE = 15;
     UPDATE_FINGER_TABLE_FORWARD = 16;
+    JUST_CHECKING = 17;
 }
 message ServerID {
     int32 serverID = 1;
@@ -202,8 +203,14 @@ message FileToTransfer {
     repeated string tags = 2;
     FileLocation location = 3;
 }
+message FileReferenceToTransfer {
+    FileReference file = 1;
+    repeated string tags = 2;
+    int32 location_hash = 3;
+}
 message FilesAllotmentTransferRequest {
     repeated FileToTransfer files = 1;
+    repeated FileReferenceToTransfer files_references = 2;
 }
 message UpdateReplicationCliqueRequest{
     ChordNodeReferences clique = 1;
