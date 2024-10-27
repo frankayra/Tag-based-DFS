@@ -375,11 +375,32 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         recovered_file = self.db_physical_files.RecoveryFileContent_ByInfo(file_hash)
         if not recovered_file: return communication_messages.FileContent(title=None, content=None)
         return communication_messages.FileContent(title=recovered_file.name, content=recovered_file.content)
+
+
+    # Operaciones CRUD que necesitan consistencia en el anillo. Se dividen en los siguientes pasos
+    # 1) Operacion sobre el nodo actual.
+    # 2) Operaciones sobre las replicas.
+    # 3) Operaciones sobre las referencias.
+        
     def add_files(self, request, context):                                                                          # ✅
         """FilesToAddWithLocation {files: FileContent[] {title: string, content: string}, tags: string[], location_hash: int}    =>    OperationResult {success: bool, message: string}"""
         print("🔹 Entre en add-files")
         try:
+            # 1) --------------------------------------
             add_files_message = self.db_physical_files.AddFiles([(file.title, file.content) for file in request.files], [tag for tag in request.tags], request.location_hash)
+
+            # 2) --------------------------------------
+            info = communication_messages.FilesToReplicate(
+                files=communication_messages.FilesToAdd(
+                    files=request.files, 
+                    tags=request.tags),
+                location_hash=request.location_hash,
+                main_replica_node_reference=self.node_reference.grpc_format
+            )
+            for n in self.replication_forest[self.node_reference]:
+                self.chord_client.replicate(n, info)
+            
+            
             return communication_messages.OperationResult(success=True, message=f"Archivos añadidos satisfactoriamente: {add_files_message}")
         except Exception as e:
             return communication_messages.OperationResult(success=False, message=f"Error al añadir los archivos solicitados: {e}")
@@ -387,9 +408,24 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         """TagQuery {tag_query: string[], operation_tags}    =>    OperationResult {success: bool, message: string}"""
         print("🔹 Entre en add-tags")
         try:
+            # 1) --------------------------------------
             tag_query = [tag for tag in request.tags_query]
             operation_tags = [tag for tag in request.operation_tags]
+
+            recovered_files = self.db_physical_files.RecoveryFilesInfo_ByTagQuery(tag_query, include_tags=True)
             add_tags_message = self.db_physical_files.AddTags(tag_query, operation_tags)
+            add_references_tags_message = self.db_references.AddTags(tag_query, operation_tags)
+
+            # 2) --------------------------------------
+            info = communication_messages.UpdateTagsRequest(
+                args=communication_messages.UpdateRequestArguments(
+                    tag_list=communication_messages.TagList(tags=tag_query)
+                ),
+                operation_tags=operation_tags,
+                node_reference=self.node_reference.grpc_format
+            )
+            for n in self.replication_forest[self.node_reference]:
+                self.chord_client.add_tags_to_replicated_files(n, info)
             return communication_messages.OperationResult(success=True, message=add_tags_message)
             # return communication_messages.OperationResult(success=True, message="Tags añadidas satisfactoriamente")
         except Exception:
@@ -398,8 +434,21 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         """TagList {tags: string}    =>    OperationResult {success: bool, message: string}"""
         print("🔹 Entre en delete")
         try:
+            # 1) --------------------------------------
             tag_query = [tag for tag in request.tags]
             delete_message = self.db_physical_files.DeleteFiles(tag_query)
+            delete_references_message = self.db_references.DeleteFiles(tag_query)
+
+            # 2) --------------------------------------
+            info = communication_messages.FilesToUpdateRequest(
+                args=communication_messages.UpdateRequestArguments(
+                    tag_list=communication_messages.TagList(tags=tag_query)
+                ),
+                node_reference=self.node_reference.grpc_format
+            )
+            for n in self.replication_forest[self.node_reference]:
+                self.chord_client.delete_files_replicas(n, communication_messages.TagList(tags=tag_query))
+            
             return communication_messages.OperationResult(success=True, message=delete_message)
             # return communication_messages.OperationResult(success=True, message="Archivos eliminados satisfactoriamente")
         except Exception:
@@ -409,9 +458,22 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         """TagQuery {tags_query: string[], operation_tags: string[]}    =>    OperationResult {success: bool, message: string}"""
         print("🔹 Entre en delete-tags")
         try:
+            # 1) --------------------------------------
             tag_query = [tag for tag in request.tags_query]
             operation_tags = [tag for tag in request.operation_tags]
             self.db_physical_files.DeleteTags(tag_query=tag_query, tags=operation_tags)
+            self.db_references.DeleteTags(tag_query=tag_query, tags=operation_tags)
+
+            # 2) --------------------------------------
+            info = communication_messages.UpdateTagsRequest(
+                args=communication_messages.UpdateRequestArguments(
+                    tag_list=communication_messages.TagList(tags=tag_query)
+                ),
+                operation_tags=operation_tags,
+                node_reference=self.node_reference.grpc_format
+            )
+            for n in self.replication_forest[self.node_reference]:
+                self.chord_client.delete_tags_from_replicated_files(n, info)
             return communication_messages.OperationResult(success=True, message="Tags eliminados satisfactoriamente")
         except Exception:
             return communication_messages.OperationResult(success=False, message="Error al eliminar los tags")
@@ -606,7 +668,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         return communication_messages.Empty()
         
     def alive_request(self, request, context):                                                                      # ✅
-        if self.any_changes_in_next_list:
+        if request.next_list_needed and self.any_changes_in_next_list:
             self.any_changes_in_next_list = False
             info = communication_messages.LiveAnswer(   any_changes=True, 
                                                         next_nodes_list=communication_messages.ChordNodeReferences(
@@ -737,32 +799,12 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
             searching_id = self.apply_offset(self.node_reference.id, 2**i)
             if self.belonging_id(searching_id): break
 
-            # Espera programada
-            operation_id = random.randint(1, 10000)
-            wait_for_results = self.PushPendingOperation(
-                operation_id=operation_id, 
-                operation=communication_messages.JUST_CHECKING, 
-                info=i+1)
+            # Busqueda
+            node = self.find_successor(searching_id)
 
-            # Soliciud
-            info = communication_messages.RingOperationRequest(
-                requesting_node=self.node_reference.grpc_format, 
-                searching_id=searching_id, 
-                requested_operation=communication_messages.JUST_CHECKING, 
-                operation_id=operation_id
-            )
-            self.succesor(info, context)
+            # Actualizacion
+            self.finger_table.insert(i, node)
 
-            # Espera iniciada
-            wait_for_results()
-
-            # Actualizacion de la finger table
-            try:
-                with self.ready_operations_locker:
-                    node, j = self.ready_operations.pop(operation_id, None)
-                    self.finger_table[i] = node
-            except Exception as e:
-                print(f"Error en la funcion rara de chequeo por la red: {e}")
 
                 
         return communication_messages.OperationReceived(success=True)
@@ -1199,49 +1241,51 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
             print("Alive check started")
             while True:
                 await asyncio.sleep(10 / heat_factor)
+                # failed_nodes = []
                 no_problem = False
                 for i, node in enumerate(self.next):
                     if no_problem: break
-                    for _ in range(3):
-                        try:
-                            response = self.chord_client.alive_request(node)
-                            if i == 0:
-                                if not response.any_changes:
-                                    no_problem = True
-                                    break
-                                print("Actualizando lista de next...")
-                                assert response.HasField('next_nodes_list')
-                                self.next.clear()
-                                for node in response.next_nodes_list.references:
-                                    self.next.append(ChordNodeReference(id=node.id, ip=node.ip, port=node.port))
-                                self.any_changes_in_next_list = True
-                                break
-                            print("Se detecto un nodo que no responde, intentando recuperar datos...")
-                            new_next_list = self.chord_client.send_me_your_next_list(node)
-                            print("Actualizando lista de next...")
-                            self.next.clear()
-                            for n in new_next_list.references:
-                                self.next.append(ChordNodeReference(id=n.id, ip=n.ip, port=n.port))
-                            self.chord_client.i_am_your_prev(node, self.node_reference.grpc_format)
-                            # Actualizando la finger table
-                            self.Update_FingerTable_WithNextList(force=True)
-
-                            self.any_changes_in_next_list = True
+                    response = await self.is_alive_async(node, 1, True)
+                    if not response: 
+                        # failed_nodes.append(node)
+                        continue
+                    if i == 0:
+                        if not response.any_changes:
                             no_problem = True
                             break
-                        except grpc.RpcError: 
-                            # time.sleep(random.randint(1, 3)/heat_factor)
-                            await asyncio.sleep(1/heat_factor)
+                        print("Actualizando lista de next...")
+                        assert response.HasField('next_nodes_list')
+                        
+                        new_next_list = [ChordNodeReference(id=n.id, ip=n.ip, port=n.port) for n in response.next_nodes_list.references]
+
+                        self.Fix_Next_List_Failures(new_next_list)
+                        self.any_changes_in_next_list = True
+                        break
+
+                    print("Se detecto un nodo que no responde, intentando recuperar datos...")
+
+                    try:
+                        new_next_list = [ChordNodeReference(id=n.id, ip=n.ip, port=n.port) for n in self.chord_client.send_me_your_next_list(node).references]
+                        
+                        self.chord_client.i_am_your_prev(node, self.node_reference.grpc_format)
+
+                        self.Fix_Next_List_Failures(new_next_list)
+                        self.any_changes_in_next_list = True
+                        no_problem = True
+                        break
+                    except grpc.RpcError: 
+                        pass
                 if not no_problem: 
                     print("No hay respuesta de los nodos proximos. La red esta temporalmente caida")
                     # self.Recover_Network()
 
                 # Revisando los ultimos heartbeats
+                failed_nodes = []
                 for node, last_heartbeat in self.last_heartbeats.items():
-                    if not self.is_alive(node):
+                    if not await self.is_alive_async(node):
                         print(f"El nodo ({node.id}) no responde a los heartbeats, se procede a eliminarlo")
-                        self.Manage_Node_Failure(node)
-                
+                        failed_nodes.append(node)
+                self.Manage_Node_Failure(failed_nodes)
         async def heartbeat():
             print("Heartbeat signals started")
             while True:
@@ -1371,50 +1415,46 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         # 8) ----------------------------------------
         self.prev = entrance_node_reference
 
-    def Manage_Node_Failure(self, failed_node: ChordNodeReference):
+    def Manage_Node_Failure(self, failed_nodes: list[ChordNodeReference]):
         """Funcion que maneja cuando un nodo falla, se encarga tanto de las replicas como de las referencias"""
         print("🔗 Entre en Manage_Node_Failure")
+        for failed_node in failed_nodes:
 
 
+            # Actualizando la lista de next[] y prev
+            if self.prev == failed_node:
+                self.prev = None
+            if failed_node in self.next:
+                self.next.remove(failed_node)
+                self.any_changes_in_next_list = True
+                # Actualizando la finger table
+                self.Update_FingerTable_WithNextList()
+            # Actualizando las replicas y referencias
+            if failed_node in self.replication_forest.keys(): # Si el nodo que fallo era el nodo principal de uno de los cliques de replicacion presentes en el nodo actual, o lo que es lo mismo, QUEDABA DETRAS en el anillo
+                
+                # Protocolo de votacion para elegir un nuevo nodo principal
+                self_responsability = True
+                for node in self.replication_forest[failed_node]:
+                    if self.id_in_between(failed_node.id, node.id, self.node_reference.id) and self.is_alive(node): # Si existe un nodo del clique de replicacion que tiene un id menor al del nodo actual, este sera el nuevo nodo principal y el nodo actual se despreocupa del procedimiento restante.
+                        self_responsability = False
+                        break
+                
+                # El nodo actual pasara a ser la nueva referencia principal del clique de replicacion
+                if self_responsability:
 
-        # Actualizando la lista de next[] y prev
-        if self.prev == failed_node:
-            self.prev = None
-        if failed_node in self.next:
-            self.next.remove(failed_node)
-            self.any_changes_in_next_list = True
-            # Actualizando la finger table
-            self.Update_FingerTable_WithNextList()
-        # Actualizando las replicas y referencias
-        if failed_node in self.replication_forest.keys(): # Si el nodo que fallo era el nodo principal de uno de los cliques de replicacion presentes en el nodo actual, o lo que es lo mismo, QUEDABA DETRAS en el anillo
-            
-            # Protocolo de votacion para elegir un nuevo nodo principal
-            self_responsability = True
-            for node in self.replication_forest[failed_node]:
-                if self.id_in_between(failed_node.id, node.id, self.node_reference.id) and self.is_alive(node): # Si existe un nodo del clique de replicacion que tiene un id menor al del nodo actual, este sera el nuevo nodo principal y el nodo actual se despreocupa del procedimiento restante.
-                    self_responsability = False
-                    break
-            
-            # El nodo actual pasara a ser la nueva referencia principal del clique de replicacion
-            if self_responsability:
-
-                # Obtenemos los datos replica de los archivos del nodo fallido
-                files_to_replicate_db = self.db_replicas.get(failed_node, None)
+                    # Obtenemos los datos replica de los archivos del nodo fallido
+                    files_to_replicate_db = self.db_replicas.get(failed_node, None)
 
 
-                # NOTE No se tiene que agregar ningun nodo nuevo al clique. Lo que se hace es:
-                # -- Operaciones involucradas: 'update_replication_clique', 'replicate'
-                # 1) Cambiar de lider a las replicas del nodo fallido en los nodos que estaban en su clique de replicacion
-                # 2) Replicar los datos del nodo fallido a los nodos que no estaban en el clique del nodo fallido pero si en el clique del nodo actual
-                # 3) Borrar el clique de replicacion del nodo fallido.
-                # 4) Cambiar los datos replica del nodo fallido en el nodo actual, para el almacenamiento en la BD fisicos.
+                    # NOTE No se tiene que agregar ningun nodo nuevo al clique. Lo que se hace es:
+                    # -- Operaciones involucradas: 'update_replication_clique', 'replicate'
+                    # 1) Cambiar de lider a las replicas del nodo fallido en los nodos que estaban en su clique de replicacion
+                    # 2) Replicar los datos del nodo fallido a los nodos que no estaban en el clique del nodo fallido pero si en el clique del nodo actual
+                    # 3) Borrar el clique de replicacion del nodo fallido.
+                    # 4) Cambiar los datos replica del nodo fallido en el nodo actual, para el almacenamiento en la BD fisicos.
 
-                # 1)-------------------------------------
-                for n in self.replication_forest[failed_node]:
-                    for i in range(2):
-                        if not self.is_alive(n):
-                            await asyncio.sleep(1/heat_factor)
-                            continue
+                    # 1)-------------------------------------
+                    for n in self.replication_forest[failed_node]:
                         try:
                             info = communication_messages.UpdateReplicationCliqueRequest(
                                 new_leader=self.node_reference.grpc_format, 
@@ -1427,15 +1467,11 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
                             self.chord_client.update_replication_clique(n, info)
                             break
                         except grpc.RpcError:
-                            print(f"Manage_Node_Failure: fallo {i+1} en la actualizacion de cliques ")
+                            print(f"Manage_Node_Failure: fallo en la actualizacion de cliques hacia el nodo ({n.id})")
                             pass
 
-                # 2)-------------------------------------
-                for n in filter(lambda n_i: n_i not in self.replication_forest[failed_node], self.replication_forest[self.node_reference]):
-                    for i in range(2):
-                        if not self.is_alive(n):
-                            await asyncio.sleep(1/heat_factor)
-                            continue
+                    # 2)-------------------------------------
+                    for n in filter(lambda n_i: n_i not in self.replication_forest[failed_node], self.replication_forest[self.node_reference]):
                         try:
                             physical_db_file, references_db_file = None, None
                             with open(files_to_replicate_db[0].name +".db", 'rb') as file:
@@ -1454,99 +1490,117 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
                             self.chord_client.send_raw_database_replica(n, info)
                             break
                         except grpc.RpcError:
-                            print(f"Manage_Node_Failure: fallo {i+1} en la actualizacion de replicas")
+                            print(f"Manage_Node_Failure: fallo en la actualizacion de replicas al nodo ({n.id})")
                             pass
-                        
+                            
+
+                    # 3)-------------------------------------
+                    del self.replication_forest[failed_node]
+
+                    # 4)-------------------------------------
+                    Change_Files_From_Replica_to_DB(failed_node)
+                    del self.db_replicas[failed_node]
+            elif failed_node in self.replication_forest[self.node_reference]: # El nodo del fallo no se le guarda replica en este nodo, o lo que es lo mismo, EL NODO DEL FALLO QUEDA DELANTE EN EL ANILLO(GUARDA UNA REPLICA DEL NODO ACTUAL)
+                # NOTE en este caso no se hace protocolo de voltacion porque ya se sabe en este punto que el nodo que fallo esta en el clique de replicacion
+                # del nodo actual, y esta delante en el anillo, por ende, el nodo actual solo se encargara de su propia replica en el nodo fallido, replicando 
+                # un nodo mas hacia delante en el anillo, y actualizando el clique de replicacion del nodo actual.
+                # -- Operaciones involucradas: 'update_replication_clique', 'replicate'
+                # 1) Buscar un nuevo nodo replica del nodo actual. No replicar en caso de que no hayan nodos disponibles, o sea, que todos los nodos del anillo guarden replica del nodo actual.
+                # 2) Replicar en el nuevo nodo replica con una lista de archivos vacia. Solo para que se cree la base de datos.
+                # 3) Mandar la base de datos pura hacia la nueva replica.
+                # 4) Actualizar el clique de replicacion del nodo actual, quitando al nodo fallido y agregando el nuevo nodo replica.
+                # 5) Actualizar el clique de replicacion de todos los nodos del clique con los cambios pertinentes.
+
+                # 1)-------------------------------------
+                new_replica_node = None
+                for n in self.next:
+                    if n not in self.replication_forest[self.node_reference] and self.is_alive(n):
+                        new_replica_node = n
+                        break
+                if not new_replica_node:
+                    print("No hay nodos disponibles para replicar")
+                    return
+                
+                # 2)-------------------------------------
+                info = communication_messages.FilesToReplicate(
+                    files= communication_messages.FilesToAdd(
+                        files=[],
+                        tags=[]
+                    ),
+                    location_hash= -1,
+                    main_replica_node_reference= self.node_reference.grpc_format
+                )
+                self.chord_client.replicate(new_replica_node, info)
 
                 # 3)-------------------------------------
-                del self.replication_forest[failed_node]
+                physical_db_file, references_db_file = None, None
+                with open("phisical_storage.db", 'rb') as file:
+                    physical_db_file = file.read()
+                with open("references.db", 'rb') as file:
+                    references_db_file = file.read()
 
+                physical_db_bytes = pickle.dumps(physical_db_file)
+                references_db_bytes = pickle.dumps(references_db_file)
+                
+                info = communication_messages.RawDatabases(
+                    db_phisical=physical_db_bytes, 
+                    db_references=references_db_bytes, 
+                    main_replica_node_reference= self.node_reference.grpc_format,
+                ) 
+                self.chord_client.send_raw_database_replica(new_replica_node, info)
+                
                 # 4)-------------------------------------
-                Change_Files_From_Replica_to_DB(failed_node)
-                del self.db_replicas[failed_node]
-        elif failed_node in self.replication_forest[self.node_reference]: # El nodo del fallo no se le guarda replica en este nodo, o lo que es lo mismo, EL NODO DEL FALLO QUEDA DELANTE EN EL ANILLO(GUARDA UNA REPLICA DEL NODO ACTUAL)
-            # NOTE en este caso no se hace protocolo de voltacion porque ya se sabe en este punto que el nodo que fallo esta en el clique de replicacion
-            # del nodo actual, y esta delante en el anillo, por ende, el nodo actual solo se encargara de su propia replica en el nodo fallido, replicando 
-            # un nodo mas hacia delante en el anillo, y actualizando el clique de replicacion del nodo actual.
-            # -- Operaciones involucradas: 'update_replication_clique', 'replicate'
-            # 1) Buscar un nuevo nodo replica del nodo actual. No replicar en caso de que no hayan nodos disponibles, o sea, que todos los nodos del anillo guarden replica del nodo actual.
-            # 2) Replicar en el nuevo nodo replica con una lista de archivos vacia. Solo para que se cree la base de datos.
-            # 3) Mandar la base de datos pura hacia la nueva replica.
-            # 4) Actualizar el clique de replicacion del nodo actual, quitando al nodo fallido y agregando el nuevo nodo replica.
-            # 5) Actualizar el clique de replicacion de todos los nodos del clique con los cambios pertinentes.
+                self.replication_forest[self.node_reference] -= {failed_node}
+                self.replication_forest[self.node_reference] |= {new_replica_node}
 
-            # 1)-------------------------------------
-            new_replica_node = None
-            for n in self.next:
-                if n not in self.replication_forest[self.node_reference] and self.is_alive(n):
-                    new_replica_node = n
-                    break
-            if not new_replica_node:
-                print("No hay nodos disponibles para replicar")
-                return
-            
-            # 2)-------------------------------------
-            info = communication_messages.FilesToReplicate(
-                files= communication_messages.FilesToAdd(
-                    files=[],
-                    tags=[]
-                ),
-                location_hash= -1,
-                main_replica_node_reference= self.node_reference.grpc_format
-            )
-            self.chord_client.replicate(new_replica_node, info)
-
-            # 3)-------------------------------------
-            physical_db_file, references_db_file = None, None
-            with open("phisical_storage.db", 'rb') as file:
-                physical_db_file = file.read()
-            with open("references.db", 'rb') as file:
-                references_db_file = file.read()
-
-            physical_db_bytes = pickle.dumps(physical_db_file)
-            references_db_bytes = pickle.dumps(references_db_file)
-            
-            info = communication_messages.RawDatabases(
-                db_phisical=physical_db_bytes, 
-                db_references=references_db_bytes, 
-                main_replica_node_reference= self.node_reference.grpc_format,
-            ) 
-            self.chord_client.send_raw_database_replica(new_replica_node, info)
-            
-            # 4)-------------------------------------
-            self.replication_forest[self.node_reference] -= {failed_node}
-            self.replication_forest[self.node_reference] |= {new_replica_node}
-
-            # 5)-------------------------------------
-            for n in self.replication_forest[self.node_reference]:
-                info = communication_messages.UpdateReplicationCliqueRequest(
-                    new_leader=self.node_reference.grpc_format, 
-                    old_leader=self.node_reference.grpc_format, 
-                    clique=communication_messages.ChordNodeReferences(
-                        references=[n_i.grpc_format for n_i in self.replication_forest[self.node_reference]]
-                    ) 
-                )
-                self.chord_client.update_replication_clique(n, info)
-            
+                # 5)-------------------------------------
+                for n in self.replication_forest[self.node_reference]:
+                    info = communication_messages.UpdateReplicationCliqueRequest(
+                        new_leader=self.node_reference.grpc_format, 
+                        old_leader=self.node_reference.grpc_format, 
+                        clique=communication_messages.ChordNodeReferences(
+                            references=[n_i.grpc_format for n_i in self.replication_forest[self.node_reference]]
+                        ) 
+                    )
+                    self.chord_client.update_replication_clique(n, info)
+                
 
 
 
         
         
-    def is_alive(self, node: ChordNodeReference, heat_factor=1):
+    def is_alive(self, node: ChordNodeReference, heat_factor=1, next_list_needed=False):
         # print("🔗 Entre en is_alive")
         if node not in last_heartbeats.keys():
             print("Se intento verificar la actividad de un nodo que no se tiene registrado")
-            return False
-        if time.time() - last_heartbeats[node] <= NET_RECOVERY_TIME: return True
+            return None
+        if time.time() - last_heartbeats[node] <= NET_RECOVERY_TIME: 
+            return None
         for _ in range(3):
             try:
-                self.chord_client.alive_request(node)
-                return True
+                response = self.chord_client.alive_request(node, next_list_needed)
+                self.last_heartbeats[node] = time.time()
+                return response
             except grpc.RpcError:
-                asyncio.sleep(1/heat_factor)
+                time.sleep(1/heat_factor)
                 continue
-        return False
+        return None
+    async def is_alive_async(self, node: ChordNodeReference, heat_factor=1, next_list_needed=False):
+        # print("🔗 Entre en is_alive")
+        if node not in last_heartbeats.keys():
+            print("Se intento verificar la actividad de un nodo que no se tiene registrado")
+            return None
+        if time.time() - last_heartbeats[node] <= NET_RECOVERY_TIME: 
+            return None
+        for _ in range(3):
+            try:
+                response = self.chord_client.alive_request(node, next_list_needed)
+                self.last_heartbeats[node] = time.time()
+                return response
+            except grpc.RpcError:
+                await asyncio.sleep(1/heat_factor)
+                continue
+        return None
     def last_node_in_replication_clique(self, main_replica: ChordNodeReference):
         # print("🔗 Entre en last_node_in_replication_clique")
         if len(self.replication_forest) or main_replica not in self.replication_forest.keys():
@@ -1569,3 +1623,108 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         self.db_references.Clear()
         # Actualizando los archivos fisicos
         # self.db_references.Clear_Physical_Files()
+
+
+    def Fix_Next_List_Failures(self, new_next_list):
+        print("🔗 Entre en Fix_Next_List_Failures")
+        # 1) Se guarda una copia de la lista next[] actual para asi ver como varia con respecto a la nueva lista(Que nodos fueron bajas y que nodos entraron).
+        # 2) Se actualiza la lista next[] con la nueva lista de nodos proximos.
+        # 3) Se itera por los nodos de la lista vieja para saber cuales fueron dados de baja(Aqui tambien puede acurrir que uno o varios nodos entraron mas adelante y algun nodo quede fuera de la lista porque no esta al alcance del nodo actual, no necesariamente tiene que ser baja).
+        #   NOTE Solo se analiza el intervalo de la lista replicable (o sea, desde su inicio hasta el factor de replicacion) que es intervalo de interes. Si habia un nodo en este intervalo antes, y ahora esta en la lista next, pero quedo fuera del intervalo, tambien debemos desreplicar los datos en el.
+        # 4) Se llama a la funcion 'Manage_Node_Failure' para que se encargue de las replicas y referencias de los nodos que fueron dados de baja.
+        # 5) Puede ocurrir que la lista next anterior no hiciera todas las replicaciones que se necesitaban. Por lo que se debe hacer una verificacion de si ya se cumplia con el factor de replicacion.
+        #   NOTE Se hace una comprobacion de consistencia aqui. No deberia pasar que el metodo 'Manage_Node_Failure' replique mas alla de lo que debe(que es solo replicar en la misma cantidad de nodos que se dieron de baja).
+        # 6) Si no se cumplia con el factor de replicacion con la lista anterior, y se puede cumplir con esta lista, se manda a replicar los datos del nodo actual en los nodos que entraron mas adelante en la nueva lista next[].
+
+        # 1) ----------------------------------------
+        old_next_list = self.next.copy()
+        
+        # 2) ----------------------------------------
+        print("Actualizando lista de next...")
+        self.next.clear()
+        for n in new_next_list:
+            self.next.append(n)
+
+        failed_nodes = []
+
+        # 3) ----------------------------------------
+        for i in range(min(len(old_next_list), self.replication_factor)):
+            if old_next_list[i] not in new_next_list[:min(len(new_next_list), self.replication_factor)]:
+                failed_nodes.append(old_next_list[i])
+
+        # 4) ----------------------------------------
+        self.Manage_Node_Failure(failed_nodes)
+
+
+        
+        # 5) ----------------------------------------
+        if len(new_next_list) <= len(old_next_list) or self.replication_fatcor <= len(old_next_list): return
+        nodes_to_replicate = new_next_list[len(old_next_list): self.replication_factor]
+        for node in nodes_to_replicate: if node in self.replication_forest[self.node_reference]: print("Falta de consistencia en la replicacion")
+
+        # 6) ----------------------------------------
+        physical_db_file, references_db_file = None, None
+        with open("phisical_storage.db", 'rb') as file:
+            physical_db_file = file.read()
+        with open("references.db", 'rb') as file:
+            references_db_file = file.read()
+
+        physical_db_bytes = pickle.dumps(physical_db_file)
+        references_db_bytes = pickle.dumps(references_db_file)
+        
+        info = communication_messages.RawDatabases(
+            db_phisical=physical_db_bytes, 
+            db_references=references_db_bytes, 
+            main_replica_node_reference= self.node_reference.grpc_format,
+        ) 
+        for new_replica_node in nodes_to_replicate:
+            self.chord_client.send_raw_database_replica(new_replica_node, info)
+
+
+    def Do_Operation_On_References(self, chord_client_operation, tag_query, info):
+        explored_nodes = set()
+        for tag in tag_query:
+            tag_id = int(sha1(tag.encode("utf-8")).hexdigest(), 16) % (2**self.nodes_count)
+            if self.belonging_id(tag_id):
+                continue
+            node = self.find_successor(tag_id)
+            if node in explored_nodes:
+                continue
+            explored_nodes.add(node)
+            try:
+                chord_client_operation(node, info)
+            except grpc.RpcError:
+                print(f"Error en la operacion de cliente en nodo ({node.id}), linea 1700")
+                pass
+            
+    def find_successor(self, id):
+        # Comprobaciones
+        if self.belonging_id(searching_id): return self.node_reference
+
+        # Espera programada
+        operation_id = random.randint(1, 10000)
+        wait_for_results = self.PushPendingOperation(
+            operation_id=operation_id, 
+            operation=communication_messages.JUST_CHECKING, 
+            info=i+1)
+
+        # Soliciud
+        info = communication_messages.RingOperationRequest(
+            requesting_node=self.node_reference.grpc_format, 
+            searching_id=searching_id, 
+            requested_operation=communication_messages.JUST_CHECKING, 
+            operation_id=operation_id
+        )
+        self.succesor(info, context)
+
+        # Espera iniciada
+        wait_for_results()
+
+        # Actualizacion de la finger table
+        try:
+            with self.ready_operations_locker:
+                node, j = self.ready_operations.pop(operation_id, None)
+                return node
+        except Exception as e:
+            print(f"Error en la funcion rara de chequeo por la red: {e}")
+            return None

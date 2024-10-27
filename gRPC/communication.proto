@@ -74,7 +74,7 @@ service ChordNetworkCommunication{
 
     
     rpc heartbeat (ChordNodeReference) returns (Empty);
-    rpc alive_request (Empty) returns (LiveAnswer);
+    rpc alive_request (NextListRequest) returns (LiveAnswer);
     rpc unreplicate (ChordNodeReference) returns (OperationResult);
     
     rpc node_entrance_request (NodeEntranceRequest) returns (OperationResult);
@@ -90,6 +90,9 @@ service ChordNetworkCommunication{
     rpc send_me_your_next_list (Empty) returns (ChordNodeReferences);
 }
 message Empty {}
+message NextListRequest {
+    bool next_list_needed = 1;
+}
 
 message FileGeneralInfoss {
     repeated FileGeneralInfo files_general_info = 1;

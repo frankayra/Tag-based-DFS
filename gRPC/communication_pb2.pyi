@@ -105,6 +105,12 @@ class Empty(_message.Message):
     __slots__ = ()
     def __init__(self) -> None: ...
 
+class NextListRequest(_message.Message):
+    __slots__ = ("next_list_needed",)
+    NEXT_LIST_NEEDED_FIELD_NUMBER: _ClassVar[int]
+    next_list_needed: bool
+    def __init__(self, next_list_needed: bool = ...) -> None: ...
+
 class FileGeneralInfoss(_message.Message):
     __slots__ = ("files_general_info",)
     FILES_GENERAL_INFO_FIELD_NUMBER: _ClassVar[int]
