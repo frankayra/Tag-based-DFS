@@ -1686,7 +1686,8 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         # 5) ----------------------------------------
         if len(new_next_list) <= len(old_next_list) or self.replication_fatcor <= len(old_next_list): return
         nodes_to_replicate = new_next_list[len(old_next_list): self.replication_factor]
-        for node in nodes_to_replicate: if node in self.replication_forest[self.node_reference]: print("Falta de consistencia en la replicacion")
+        for node in nodes_to_replicate: 
+            if node in self.replication_forest[self.node_reference]: print("Falta de consistencia en la replicacion")
 
         # 6) ----------------------------------------
         physical_db_file, references_db_file = None, None
@@ -1709,63 +1710,31 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
 
     def Do_Operation_On_References(self, chord_client_operation_function, tag_query, info):
         explored_nodes = set()
-        files_addresses = { }
         tags_addresses = { }
         tag_query.sort()
 
-        if info.HasField("files"):
-            for file in info.files:
-                file.tags.sort()
-                for tag in file.tags:
-                    tag_id = int(sha1(tag.encode("utf-8")).hexdigest(), 16) % (2**self.nodes_count)
-                    if self.belonging_id(tag_id):
-                        continue
+        for tag in tag_query:
+            tag_id = int(sha1(tag.encode("utf-8")).hexdigest(), 16) % (2**self.nodes_count)
+            if self.belonging_id(tag_id):
+                continue
+            node_explored = False
+            for tag_key, node in tags_addresses.items():
+                if self.id_in_between(tag_key, tag_id, node.id):
+                    node_explored = True
+                    break
+            if node_explored: continue
 
-                    tag_place_cached = False
-                    for tag_key, node in tags_addresses.items():
-                        if self.id_in_between(tag_key, tag_id, node.id):
-                            tag_place_cached = True
-                            if files_addresses.get(node, None):
-                                files_addresses[node].add(file)
-                            else:
-                                files_addresses[node] = {file}
-                    if not tag_place_cached:
-                        node = self.find_successor(tag_id)
-                        tags_addresses[tag_id] = node
-                        if files_addresses.get(node, None):
-                            files_addresses[node].add(file)
-                        else: files_addresses[node] = {file}
-                            
-            for node, files in files_addresses.items():
-                try:
-                    chord_client_operation_function(node, info)
-                except grpc.RpcError:
-                    print(f"Error en la operacion de cliente en nodo ({node.id}), linea 1740")
+            node = self.find_successor(tag_id)
+            tags_addresses[tag_id] = node
+            if node in explored_nodes:
+                continue
+            explored_nodes.add(node)
 
-            
-        else:
-            for tag in tag_query:
-                tag_id = int(sha1(tag.encode("utf-8")).hexdigest(), 16) % (2**self.nodes_count)
-                if self.belonging_id(tag_id):
-                    continue
-                node_explored = False
-                for tag_key, node in tags_addresses.items():
-                    if self.id_in_between(tag_key, tag_id, node.id):
-                        node_explored = True
-                        break
-                if node_explored: continue
-
-                node = self.find_successor(tag_id)
-                tags_addresses[tag_id] = node
-                if node in explored_nodes:
-                    continue
-                explored_nodes.add(node)
-
-                try:
-                    chord_client_operation_function(node, info)
-                except grpc.RpcError:
-                    print(f"Error en la operacion de cliente en nodo ({node.id}), linea 1760")
-                    pass
+            try:
+                chord_client_operation_function(node, info)
+            except grpc.RpcError:
+                print(f"Error en la operacion de cliente en nodo ({node.id}), linea 1760")
+                pass
 
     def find_successor(self, id):
         # Comprobaciones
