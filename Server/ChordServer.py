@@ -400,7 +400,14 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
             for n in self.replication_forest[self.node_reference]:
                 self.chord_client.replicate(n, info)
             
-            
+            # 3) --------------------------------------
+            tag_query = [tag for tag in request.tags]
+            info = communication_messages.FilesReferencesToAdd(
+                location_hash=request.location_hash,
+                files_references=[communication_messages.FileReference(title=file.title, file_hash=file.content) for file in request.files],
+                tags=tag_query
+            )
+            self.Do_Operation_On_References(chord_client_operation_function=self.chord_client.add_references, tag_query=tag_query, info=info)
             return communication_messages.OperationResult(success=True, message=f"Archivos añadidos satisfactoriamente: {add_files_message}")
         except Exception as e:
             return communication_messages.OperationResult(success=False, message=f"Error al añadir los archivos solicitados: {e}")
@@ -426,6 +433,13 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
             )
             for n in self.replication_forest[self.node_reference]:
                 self.chord_client.add_tags_to_replicated_files(n, info)
+                
+            # 3) --------------------------------------
+            info = communication_messages.TagQuery(
+                tags_query=tag_query,
+                operation_tags=operation_tags
+            )
+            self.Do_Operation_On_References(chord_client_operation_function=self.chord_client.add_tags, tag_query=tag_query, info=info)
             return communication_messages.OperationResult(success=True, message=add_tags_message)
             # return communication_messages.OperationResult(success=True, message="Tags añadidas satisfactoriamente")
         except Exception:
@@ -448,6 +462,10 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
             )
             for n in self.replication_forest[self.node_reference]:
                 self.chord_client.delete_files_replicas(n, communication_messages.TagList(tags=tag_query))
+
+            # 3) --------------------------------------
+            info = communication_messages.TagList(tags=tag_query)
+            self.Do_Operation_On_References(chord_client_operation_function=self.chord_client.detele, tag_query=tag_query, info=info)
             
             return communication_messages.OperationResult(success=True, message=delete_message)
             # return communication_messages.OperationResult(success=True, message="Archivos eliminados satisfactoriamente")
@@ -474,6 +492,14 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
             )
             for n in self.replication_forest[self.node_reference]:
                 self.chord_client.delete_tags_from_replicated_files(n, info)
+            
+            # 3) --------------------------------------
+            info = communication_messages.TagQuery(
+                tags_query=tag_query,
+                operation_tags=operation_tags
+            )
+            self.Do_Operation_On_References(chord_client_operation_function=self.chord_client.delete_tags, tag_query=tag_query, info=info)
+
             return communication_messages.OperationResult(success=True, message="Tags eliminados satisfactoriamente")
         except Exception:
             return communication_messages.OperationResult(success=False, message="Error al eliminar los tags")
@@ -1681,22 +1707,66 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
             self.chord_client.send_raw_database_replica(new_replica_node, info)
 
 
-    def Do_Operation_On_References(self, chord_client_operation, tag_query, info):
+    def Do_Operation_On_References(self, chord_client_operation_function, tag_query, info):
         explored_nodes = set()
-        for tag in tag_query:
-            tag_id = int(sha1(tag.encode("utf-8")).hexdigest(), 16) % (2**self.nodes_count)
-            if self.belonging_id(tag_id):
-                continue
-            node = self.find_successor(tag_id)
-            if node in explored_nodes:
-                continue
-            explored_nodes.add(node)
-            try:
-                chord_client_operation(node, info)
-            except grpc.RpcError:
-                print(f"Error en la operacion de cliente en nodo ({node.id}), linea 1700")
-                pass
+        files_addresses = { }
+        tags_addresses = { }
+        tag_query.sort()
+
+        if info.HasField("files"):
+            for file in info.files:
+                file.tags.sort()
+                for tag in file.tags:
+                    tag_id = int(sha1(tag.encode("utf-8")).hexdigest(), 16) % (2**self.nodes_count)
+                    if self.belonging_id(tag_id):
+                        continue
+
+                    tag_place_cached = False
+                    for tag_key, node in tags_addresses.items():
+                        if self.id_in_between(tag_key, tag_id, node.id):
+                            tag_place_cached = True
+                            if files_addresses.get(node, None):
+                                files_addresses[node].add(file)
+                            else:
+                                files_addresses[node] = {file}
+                    if not tag_place_cached:
+                        node = self.find_successor(tag_id)
+                        tags_addresses[tag_id] = node
+                        if files_addresses.get(node, None):
+                            files_addresses[node].add(file)
+                        else: files_addresses[node] = {file}
+                            
+            for node, files in files_addresses.items():
+                try:
+                    chord_client_operation_function(node, info)
+                except grpc.RpcError:
+                    print(f"Error en la operacion de cliente en nodo ({node.id}), linea 1740")
+
             
+        else:
+            for tag in tag_query:
+                tag_id = int(sha1(tag.encode("utf-8")).hexdigest(), 16) % (2**self.nodes_count)
+                if self.belonging_id(tag_id):
+                    continue
+                node_explored = False
+                for tag_key, node in tags_addresses.items():
+                    if self.id_in_between(tag_key, tag_id, node.id):
+                        node_explored = True
+                        break
+                if node_explored: continue
+
+                node = self.find_successor(tag_id)
+                tags_addresses[tag_id] = node
+                if node in explored_nodes:
+                    continue
+                explored_nodes.add(node)
+
+                try:
+                    chord_client_operation_function(node, info)
+                except grpc.RpcError:
+                    print(f"Error en la operacion de cliente en nodo ({node.id}), linea 1760")
+                    pass
+
     def find_successor(self, id):
         # Comprobaciones
         if self.belonging_id(searching_id): return self.node_reference
