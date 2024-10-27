@@ -12,6 +12,8 @@ import atexit
 from multiprocessing import Manager, Queue
 import asyncio
 import pickle
+import typing
+
 
 
 import docker
@@ -805,7 +807,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         ControlledThread(target=self.chord_client.update_next, args=(self.prev, info), name=f"update_next a: ({self.prev.id})")
         
         # 4) -----------------------------------------
-        self.recplication_forest[self.node_reference] = set()
+        self.replication_forest[self.node_reference] = set()
         self.replication_forest[self.node_reference].update(self.next[:min(self.replication_factor, len(self.next))])
 
         # 5) -----------------------------------------
@@ -1162,9 +1164,9 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         else: return None
         return result
                 
-    
 
-    def AddFiles_To_Replica(self, main_replica_node: ChordNodeReference, files: list[dict[str, object]]):
+
+    def AddFiles_To_Replica(self, main_replica_node: ChordNodeReference, files):
         print("🔗 Entre en AddFiles_To_Replica")
         replication_db = self.db_replicas.get(main_replica_node, None)
         result_log = ""
@@ -1173,7 +1175,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
                 result_log += replication_db[0].SaveFile(file["name"], file["content"], file["location_hash"], *file["tags"])
         return result_log
 
-    def AddReferences_To_Replica(self, main_replica_node: ChordNodeReference, files_references: list[dict[str, object]]):
+    def AddReferences_To_Replica(self, main_replica_node: ChordNodeReference, files_references):
         print("🔗 Entre en AddReferences_To_Replica")
         replication_db = self.db_replicas.get(main_replica_node, None)
         result_log = ""
@@ -1182,7 +1184,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
                 replication_db[1].SaveFile(file["name"], file["file_hash"], file["location_hash"], *file["tags"])
         return result_log
     
-    def AddTags_To_Replica(self, main_replica_node:ChordNodeReference, tag_query: list[str], tag_list: list[str]):
+    def AddTags_To_Replica(self, main_replica_node:ChordNodeReference, tag_query, tag_list):
         print("🔗 Entre en AddTags_To_Replica")
         result_log = ""
         replication_db = self.db_replicas.get(main_replica_node, None)
@@ -1193,7 +1195,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
 
                 
                 
-    def DeleteFiles_From_Replica(self, main_replica_node: ChordNodeReference, tag_query: list[str]):
+    def DeleteFiles_From_Replica(self, main_replica_node: ChordNodeReference, tag_query):
         print("🔗 Entre en DeleteFiles_From_Replica")
         replication_db = self.db_replicas.get(main_replica_node, None)
         # if not replication_db: 
@@ -1205,7 +1207,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         return result_log
         # self.db_physical_files.File.delete().execute()
         # self.db_physical_files.FileTag.delete().execute()
-    def DeleteTags_From_Replica(self, main_replica_node:ChordNodeReference, tag_query: list[str], tag_list: list[str]):
+    def DeleteTags_From_Replica(self, main_replica_node:ChordNodeReference, tag_query, tag_list):
         print("🔗 Entre en DeleteTags_From_Replica")
         result_log = ""
         replication_db = self.db_replicas.get(main_replica_node, None)
@@ -1237,23 +1239,23 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
             result.append({"name": file.name, "content": file.content, "location_hash": file.location_hash, "tags": [tag.tag.name for tag in file.tags]})
             if pop_reference: file.delete_instance()
         return result
-    def AddFiles_To_References(self, files: list[dict[str, object]]):
+    def AddFiles_To_References(self, files):
         print("🔗 Entre en AddFiles_To_References")
         result_log = ""
         for file in files:
             result_log += self.db_references.SaveFile(file["name"], file["file_hash"], file["location_hash"], *file["tags"])
         return result_log
-    def AddTags_To_References(self, tag_query: list[str], tag_list: list[str]):
+    def AddTags_To_References(self, tag_query, tag_list):
         print("🔗 Entre en AddTags_To_References")
         result_log = ""
         result_log += self.db_references.AddTags(tag_query, tag_list)
         return result_log
-    def DeleteTags_From_References(self, tag_query: list[str], tag_list: list[str]):
+    def DeleteTags_From_References(self, tag_query, tag_list):
         print("🔗 Entre en DeleteTags_From_References")
         result_log = ""
         result_log += self.db_references.DeleteTags(tag_query, tag_list)
         return result_log
-    def DeleteFiles_From_References(self, tag_query: list[str]):
+    def DeleteFiles_From_References(self, tag_query):
         print("🔗 Entre en DeleteFiles_From_References")
         result_log = ""
         result_log += self.db_references.DeleteFiles(tag_query)
@@ -1441,7 +1443,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         # 8) ----------------------------------------
         self.prev = entrance_node_reference
 
-    def Manage_Node_Failure(self, failed_nodes: list[ChordNodeReference]):
+    def Manage_Node_Failure(self, failed_nodes):
         """Funcion que maneja cuando un nodo falla, se encarga tanto de las replicas como de las referencias"""
         print("🔗 Entre en Manage_Node_Failure")
         for failed_node in failed_nodes:
@@ -1597,10 +1599,10 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         
     def is_alive(self, node: ChordNodeReference, heat_factor=1, next_list_needed=False):
         # print("🔗 Entre en is_alive")
-        if node not in last_heartbeats.keys():
+        if node not in self.last_heartbeats.keys():
             print("Se intento verificar la actividad de un nodo que no se tiene registrado")
             return None
-        if time.time() - last_heartbeats[node] <= NET_RECOVERY_TIME: 
+        if time.time() - self.last_heartbeats[node] <= NET_RECOVERY_TIME: 
             return None
         for _ in range(3):
             try:
@@ -1613,10 +1615,10 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         return None
     async def is_alive_async(self, node: ChordNodeReference, heat_factor=1, next_list_needed=False):
         # print("🔗 Entre en is_alive")
-        if node not in last_heartbeats.keys():
+        if node not in self.last_heartbeats.keys():
             print("Se intento verificar la actividad de un nodo que no se tiene registrado")
             return None
-        if time.time() - last_heartbeats[node] <= NET_RECOVERY_TIME: 
+        if time.time() - self.last_heartbeats[node] <= NET_RECOVERY_TIME: 
             return None
         for _ in range(3):
             try:
