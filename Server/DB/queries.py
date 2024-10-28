@@ -157,7 +157,7 @@ class File_Tag_DB:
                                                                         .where(FileTag.file == file_hash)
                                                                         .where(Tag.name.in_(tags)))]
             FileTag.delete().where(FileTag.id.in_(filtered_filetags_to_delete)).execute()
-    def JoinDatabase(DB):
+    def JoinDatabase(self, DB):
         for file in DB.File.select():
             self.SaveFile(file.name, file.content, file.location_hash, [tag.name for tag in file.tags])
             
