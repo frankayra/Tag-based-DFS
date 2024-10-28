@@ -124,6 +124,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         ControlledThread(target=self.Manage_Heartbeats_AliveRequests, name="live_check")
         self.process_executor = ProcessPoolExecutor(max_workers=3)
         atexit.register(lambda: self.process_executor.shutdown(wait=True))
+        self.replication_forest[self.node_reference] = set()
 
     def serve(self, port=50052):                                                                                    # ✅
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=2))
@@ -1069,7 +1070,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         print("🔗 Entre en Update_FingerTable_WithNextList")
         self_id = self.node_reference.id
         next_index = 0
-        stop_updating = False
+        stop_updating = len(self.next) == 0
         for i in range(self.nodes_count):
             if stop_updating: break
             while not stop_updating:
@@ -1121,8 +1122,8 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
     def Change_Files_From_DB_to_Replicas(self, new_main_replica_node, pop_files=True):
         print("🔗 Entre en Change_Files_From_DB_to_Replicas")
         top_id = new_main_replica_node.id
-        files_to_transfer = self.db_physical_files.File.select().where(self.db_physical_files.File.location_hash <= top_id) # La condicion de '''self.db_references.File.location_hash > bottom_id, ''' no es necesaria porque los archivos del nodo actual estan asignados aqui por tal motivo.
-        files_references_to_transfer = self.db_references.File.select().where(self.db_references.File.location_hash <= top_id) 
+        files_to_transfer = self.db_physical_files.File.select(self.db_physical_files.File).where(self.db_physical_files.File.location_hash <= top_id) # La condicion de '''self.db_references.File.location_hash > bottom_id, ''' no es necesaria porque los archivos del nodo actual estan asignados aqui por tal motivo.
+        files_references_to_transfer = self.db_references.File.select(self.db_references.File).where(self.db_references.File.location_hash <= top_id) 
         result = {"files": [], "references": []}
         # assert not self.db_replicas.get(new_main_replica_node, None)
         self.db_replicas[new_main_replica_node] = (File_Tag_DB(f"phisical_storage-{new_main_replica_node.id}-{self.node_reference.id}")
@@ -1130,13 +1131,16 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         replica_physical_storage = self.db_replicas[new_main_replica_node][0]
         replica_references = self.db_replicas[new_main_replica_node][1]
         for file in files_to_transfer:
-            result["files"].append({"name": file.name, "content": file.content, "file_hash": file.file_hash, "location_hash": file.location_hash, "tags": [tag.tag.name for tag in file.tags]})
-            replica_physical_storage.SaveFile(file["name"], file["content"], file["location_hash"], *[tag.tag.name for tag in file["tags"]])
+            print("file content: ", file.content)
+            file_tags = [tag.tag.name for tag in file.tags]
+            result["files"].append({"name": file.name, "content": file.content, "file_hash": file.file_hash, "location_hash": file.location_hash, "tags": file_tags})
+            replica_physical_storage.SaveFile(file.name, file.content, file.location_hash, *[tag.tag.name for tag in file.tags])
             if pop_files: file.delete_instance()
 
         for file in files_references_to_transfer:
-            result["references"].append({"name": file.name, "file_hash": file.file_hash, "location_hash": file.location_hash, "tags": [tag.tag.name for tag in file.tags]})
-            replica_references.SaveFile(file["name"], file["file_hash"], ile["location_hash"], *[tag.tag.name for tag in file["tags"]])
+            file_tags = [tag.tag.name for tag in file.tags]
+            result["references"].append({"name": file.name, "file_hash": file.file_hash, "location_hash": file.location_hash, "tags": file_tags})
+            replica_references.SaveFile(file.name, file.file_hash, file.location_hash, *[tag.tag.name for tag in file.tags])
             if pop_files: file.delete_instance()
         return result
 
@@ -1270,6 +1274,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
             while True:
                 await asyncio.sleep(10 / heat_factor)
                 # failed_nodes = []
+                if not self.next: continue
                 no_problem = False
                 for i, node in enumerate(self.next):
                     if no_problem: break
@@ -1431,7 +1436,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
 
 
         # 7) ----------------------------------------
-        if len(self.replication_forest[self.node_reference]) -1 >= self.replication_factor: 
+        if len(self.replication_forest[self.node_reference]) >= self.replication_factor: 
             node_to_unreplicate = self.last_node_in_replication_clique(entrance_node_reference)
             if node_to_unreplicate == self.node_reference:
                 del self.replication_forest[entrance_node_reference]
@@ -1598,11 +1603,8 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         
         
     def is_alive(self, node: ChordNodeReference, heat_factor=1, next_list_needed=False):
-        # print("🔗 Entre en is_alive")
-        if node not in self.last_heartbeats.keys():
-            print("Se intento verificar la actividad de un nodo que no se tiene registrado")
-            return None
-        if time.time() - self.last_heartbeats[node] <= NET_RECOVERY_TIME: 
+        print("🔗 Entre en is_alive")
+        if node in self.last_heartbeats.keys() and time.time() - self.last_heartbeats[node] <= self.NET_RECOVERY_TIME: 
             return None
         for _ in range(3):
             try:
@@ -1614,11 +1616,8 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
                 continue
         return None
     async def is_alive_async(self, node: ChordNodeReference, heat_factor=1, next_list_needed=False):
-        # print("🔗 Entre en is_alive")
-        if node not in self.last_heartbeats.keys():
-            print("Se intento verificar la actividad de un nodo que no se tiene registrado")
-            return None
-        if time.time() - self.last_heartbeats[node] <= NET_RECOVERY_TIME: 
+        print("🔗 Entre en is_alive")
+        if node in self.last_heartbeats.keys() and time.time() - self.last_heartbeats[node] <= self.NET_RECOVERY_TIME: 
             return None
         for _ in range(3):
             try:
@@ -1630,7 +1629,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
                 continue
         return None
     def last_node_in_replication_clique(self, main_replica: ChordNodeReference):
-        # print("🔗 Entre en last_node_in_replication_clique")
+        print("🔗 Entre en last_node_in_replication_clique")
         if len(self.replication_forest) or main_replica not in self.replication_forest.keys():
             return None
         from_main_replica_to_max = sorted(filter(lambda n_i: main_replica.id < n_i.id, self.replication_forest[main_replica] | self.node_reference), key=lambda n: n.id)

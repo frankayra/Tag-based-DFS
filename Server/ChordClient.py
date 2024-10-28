@@ -117,15 +117,18 @@ class ChordClient:
 # Replication y referencias
 # ----------------------------------
     def replicate(self, node_reference, info): 
+        print(f"📡 solicitud a {node_reference.ip}:{node_reference.port} de replicate")
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
             return stub.replicate(info)
     def send_raw_database_replica(self, node_reference, info):
+        print(f"📡 solicitud a {node_reference.ip}:{node_reference.port} de send_raw_database_replica")
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
             return stub.send_raw_database_replica(info)
     # def add_references(self, node_reference, info): pass
     def delete_files_replicas(self, node_reference, info): 
+        print(f"📡 solicitud a {node_reference.ip}:{node_reference.port} de delete_files_replicas")
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
             return stub.delete_files_replicas(info)
@@ -136,11 +139,13 @@ class ChordClient:
 # ----------------------------------
     # def add_tags_to_refered_files(self, node_reference, info): pass
     def add_tags_to_replicated_files(self, node_reference, info): 
+        print(f"📡 solicitud a {node_reference.ip}:{node_reference.port} de add_tags_to_replicated_files")
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
             return stub.add_tags_to_replicated_files(info)
     # def delete_tags_from_refered_files(self, node_reference, info): pass
     def delete_tags_from_replicated_files(self, node_reference, info): 
+        print(f"📡 solicitud a {node_reference.ip}:{node_reference.port} de delete_tags_from_replicated_files")
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
             return stub.delete_tags_from_replicated_files(info)
@@ -149,14 +154,17 @@ class ChordClient:
 # Protocolo Heartbeat y AliveRequest (para replicas y nodos proximos respectivamente)
 # ----------------------------------
     def heartbeat(self, node_reference, info): 
+        print(f"📡 solicitud a {node_reference.ip}:{node_reference.port} de heartbeat")
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
             return stub.heartbeat(info)
     def alive_request(self, node_reference, next_list_needed=False): 
+        print(f"📡 solicitud a {node_reference.ip}:{node_reference.port} de alive_request")
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
             return stub.alive_request(communication_messages.NextListRequest(next_list_needed=next_list_needed))
     def unreplicate(self, node_reference, info): 
+        print(f"📡 solicitud a {node_reference.ip}:{node_reference.port} de unreplicate")
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
             return stub.unreplicate(info)
@@ -181,10 +189,12 @@ class ChordClient:
             stub = communication.ChordNetworkCommunicationStub(channel)
             return stub.update_next(info)
     def files_allotment_transfer(self, node_reference, info): 
+        print(f"📡 solicitud a {node_reference.ip}:{node_reference.port} de files_allotment_transfer")
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
             return stub.files_allotment_transfer(info)
     def update_replication_clique(self, node_reference, info): 
+        print(f"📡 solicitud a {node_reference.ip}:{node_reference.port} de update_replication_clique")
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
             return stub.update_replication_clique(info)
@@ -193,6 +203,7 @@ class ChordClient:
 # Salida de un nodo de la red
 # ----------------------------------
     def i_am_your_prev(self, node_reference, info): 
+        print(f"📡 solicitud a {node_reference.ip}:{node_reference.port} de i_am_your_prev")
         with grpc.insecure_channel(node_reference.uri_address) as channel:
             stub = communication.ChordNetworkCommunicationStub(channel)
             return stub.i_am_your_prev(info)
