@@ -138,6 +138,11 @@ class ChordClient:
 # Actualizar Referencias y Replicas (Modificacion de Tags)
 # ----------------------------------
     # def add_tags_to_refered_files(self, node_reference, info): pass
+    def add_references(self, node_reference, info):
+        print(f"📡 solicitud a {node_reference.ip}:{node_reference.port} de add_references")
+        with grpc.insecure_channel(node_reference.uri_address) as channel:
+            stub = communication.ChordNetworkCommunicationStub(channel)
+            return stub.add_references(info)
     def add_tags_to_replicated_files(self, node_reference, info): 
         print(f"📡 solicitud a {node_reference.ip}:{node_reference.port} de add_tags_to_replicated_files")
         with grpc.insecure_channel(node_reference.uri_address) as channel:

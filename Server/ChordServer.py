@@ -13,6 +13,7 @@ from multiprocessing import Manager, Queue
 import asyncio
 import pickle
 import typing
+import traceback
 
 
 
@@ -407,12 +408,14 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
             tag_query = [tag for tag in request.tags]
             info = communication_messages.FilesReferencesToAdd(
                 location_hash=request.location_hash,
-                files_references=[communication_messages.FileReference(title=file.title, file_hash=file.content) for file in request.files],
+                files_references=[communication_messages.FileReference(title=file.title, file_hash=int(sha1(file.content.encode("utf-8")).hexdigest(), 16) % 10000000) for file in request.files],
                 tags=tag_query
             )
             self.Do_Operation_On_References(chord_client_operation_function=self.chord_client.add_references, tag_query=tag_query, info=info)
             return communication_messages.OperationResult(success=True, message=f"Archivos añadidos satisfactoriamente: {add_files_message}")
         except Exception as e:
+            mensaje_error = traceback.format_exc()
+            print(mensaje_error)
             return communication_messages.OperationResult(success=False, message=f"Error al añadir los archivos solicitados: {e}")
     def add_tags(self, request, context):                                                                           # ✅
         """TagQuery {tag_query: string[], operation_tags}    =>    OperationResult {success: bool, message: string}"""
@@ -1340,7 +1343,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
                     if not live_response:
                         print(f"El nodo ({node.id}) no responde a los live requests y no ha enviado heartbeats hace tiempo, se procede a eliminarlo")
                         failed_nodes.append(node)
-                        del last_heartbeat[node]
+                        last_heartbeat.pop(node)
                 if failed_nodes: self.Manage_Node_Failure(failed_nodes)
         async def heartbeat():
             print("Heartbeat signals started")
@@ -1471,8 +1474,8 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         if len(self.replication_forest[self.node_reference]) >= self.replication_factor: 
             node_to_unreplicate = self.last_node_in_replication_clique(entrance_node_reference)
             if node_to_unreplicate == self.node_reference:
-                del self.replication_forest[entrance_node_reference]
-                del self.db_replicas[entrance_node_reference]
+                self.replication_forest.pop(entrance_node_reference)
+                self.db_replicas.pop(entrance_node_reference)
             elif node_to_unreplicate:
                 self.chord_client.unreplicate(node_reference=node_to_unreplicate, info=entrance_node_reference.grpc_format)
                 self.replication_forest[entrance_node_reference] -= { node_to_unreplicate }

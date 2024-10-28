@@ -184,6 +184,9 @@ class ClientAPIServer(communication.ClientAPIServicer):
         self.chord_client.succesor(requesting_node=self.chord_server.node_reference, node_reference=self.chord_server.next[0], searching_id=random_selected_tag_hash, requested_operation=communication_messages.ADD_FILES, operation_id=operation_id)
         results = wait_for_results()
 
+        # assigned_node = self.chord_server.find_successor(random_selected_tag_hash)
+        # results = self.chord_server.RetakePendingOperation(assigned_node, communication_messages.ADD_FILES, info)
+
 
         if isinstance(results, Exception):
             return communication_messages.OperationResult(success=False, message=str(results))

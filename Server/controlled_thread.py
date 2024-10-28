@@ -25,8 +25,9 @@ class ControlledThread:
         try:
             method(*args)
         except Exception as e:
-            print(f"{type(e).__name__}: Hubo un error no controlado en el ControlledThread '{name}':    [{e}]")
-            raise e
+            pass
+            # print(f"{type(e).__name__}: Hubo un error no controlado en el ControlledThread '{name}':    [{e}]")
+            # raise e
         finally:
             del ControlledThread.active_threads[name]
             # ControlledThread.active_threads_count -=1
