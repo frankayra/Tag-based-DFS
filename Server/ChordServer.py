@@ -547,7 +547,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
             self.db_physical_files.JoinDatabase(physical_storage_db)
             self.db_references.JoinDatabase(references_db)
         else:
-            if not self.replication_forest[main_replica_node_reference]:
+            if not self.replication_forest.get(main_replica_node_reference, None):
                 self.replication_forest[main_replica_node_reference] = set()
             self.db_replicas[main_replica_node_reference][0].JoinDatabase(physical_storage_db)
             self.db_replicas[main_replica_node_reference][1].JoinDatabase(references_db)
@@ -885,6 +885,9 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
             clique = [ChordNodeReference(ip=node.ip, port=node.port, id=node.id) for node in request.clique.references]
             if old_leader.id == new_leader.id: # Se detecto una baja DESDE la replica principal. Simplemente se quiere actualizar el clique
                 self.replication_forest[new_leader] = set(clique)
+                if not self.db_replicas.get(new_leader, None):
+                    self.db_replicas[new_leader] = (File_Tag_DB(f"phisical_storage-{new_leader.id}-{self.node_reference.id}")
+                                                    , Files_References_DB(f"references-{new_leader.id}-{self.node_reference.id}"))
             elif self.id_in_between(new_leader.id, old_leader.id, self.node_reference.id): # old_leader.id > new_leader.id --> Esta entrando un nodo.
                 self.replication_forest[new_leader] = set(clique)
                 self.Change_Replica_Leader(old_leader, new_leader)
@@ -1068,9 +1071,12 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
 
     def Update_FingerTable_WithNextList(self, force=False):                                                                      # ✅
         print("🔗 Entre en Update_FingerTable_WithNextList")
+        if not self.next:
+            self.finger_table.clear()
+            return
         self_id = self.node_reference.id
         next_index = 0
-        stop_updating = len(self.next) == 0
+        stop_updating = False
         for i in range(self.nodes_count):
             if stop_updating: break
             while not stop_updating:
@@ -1093,21 +1099,23 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
 # Replicas
     def Change_Replica_Leader(old_leader: ChordNodeReference, new_leader: ChordNodeReference):
         print("🔗 Entre en Change_Replica_Leader")
-        self.db_replicas[new_leader] = (File_Tag_DB(f"phisical_storage-{new_leader.id}-{self.node_reference.id}")
+        if not self.db_replicas.get(new_leader, None):
+            self.db_replicas[new_leader] = (File_Tag_DB(f"phisical_storage-{new_leader.id}-{self.node_reference.id}")
                                                     , Files_References_DB(f"references-{new_leader.id}-{self.node_reference.id}"))
         replica_db = self.db_replicas.get(old_leader, None)
-        result = []
         if replica_db:
             physical_storage = replica_db[0]
             references = replica_db[1]
             top_id = new_leader.id
             physical_files = physical_storage.File.select().where(physical_storage.File.location_hash <= top_id)
             references_files = references.File.select().where(references.File.location_hash <= top_id)
+
+            physical_storage = self.db_replicas[new_leader][0]
+            references = self.db_replicas[new_leader][1]
             for file in physical_files:
                 physical_storage.SaveFile(file["name"], file["content"], file["location_hash"], *file["tags"])
             for file in references_files:
                 references.SaveFile(file["name"], file["file_hash"], file["location_hash"], *file["tags"])
-            return True
     def Join_Replica_Leader(new_leader: ChordNodeReference, old_leader: ChordNodeReference):
         print("🔗 Entre en Join_Replica_Leader")
         replica_db = self.db_replicas.pop(old_leader, None)
@@ -1316,7 +1324,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
                 failed_nodes = []
                 for node, last_heartbeat in self.last_heartbeats.items():
                     if not await self.is_alive_async(node):
-                        print(f"El nodo ({node.id}) no responde a los heartbeats, se procede a eliminarlo")
+                        print(f"El nodo ({node.id}) no responde a los live requests y no ha enviado heartbeats hace tiempo, se procede a eliminarlo")
                         failed_nodes.append(node)
                 self.Manage_Node_Failure(failed_nodes)
         async def heartbeat():
@@ -1440,6 +1448,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
             node_to_unreplicate = self.last_node_in_replication_clique(entrance_node_reference)
             if node_to_unreplicate == self.node_reference:
                 del self.replication_forest[entrance_node_reference]
+                del self.db_replicas[entrance_node_reference]
             else:
                 self.chord_client.unreplicate(node_reference=node_to_unreplicate, info=entrance_node_reference.grpc_format)
                 self.replication_forest[entrance_node_reference] -= { node_to_unreplicate }
@@ -1531,8 +1540,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
                     del self.replication_forest[failed_node]
 
                     # 4)-------------------------------------
-                    Change_Files_From_Replica_to_DB(failed_node)
-                    del self.db_replicas[failed_node]
+                    self.Change_Files_From_Replica_to_DB(failed_node)
             elif failed_node in self.replication_forest[self.node_reference]: # El nodo del fallo no se le guarda replica en este nodo, o lo que es lo mismo, EL NODO DEL FALLO QUEDA DELANTE EN EL ANILLO(GUARDA UNA REPLICA DEL NODO ACTUAL)
                 # NOTE en este caso no se hace protocolo de voltacion porque ya se sabe en este punto que el nodo que fallo esta en el clique de replicacion
                 # del nodo actual, y esta delante en el anillo, por ende, el nodo actual solo se encargara de su propia replica en el nodo fallido, replicando 
@@ -1604,7 +1612,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         
     def is_alive(self, node: ChordNodeReference, heat_factor=1, next_list_needed=False):
         print("🔗 Entre en is_alive")
-        if node in self.last_heartbeats.keys() and time.time() - self.last_heartbeats[node] <= self.NET_RECOVERY_TIME: 
+        if node in self.last_heartbeats.keys() and time.time() - self.last_heartbeats[node] > self.NET_RECOVERY_TIME: 
             return None
         for _ in range(3):
             try:
@@ -1612,6 +1620,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
                 self.last_heartbeats[node] = time.time()
                 return response
             except grpc.RpcError:
+                print("alive request fallido al nodo", node.id)
                 time.sleep(1/heat_factor)
                 continue
         return None
