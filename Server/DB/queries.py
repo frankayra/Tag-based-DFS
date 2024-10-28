@@ -336,7 +336,7 @@ class Files_References_DB(File_Tag_DB):
             FileTag.delete().where(FileTag.id.in_(filtered_filetags_to_delete)).execute()
                 
 
-    def JoinDatabase(DB):
+    def JoinDatabase(self, DB):
         for file in DB.File.select():
             self.SaveFile(file.name, file.file_hash, file.location_hash, [tag.name for tag in file.tags])
     

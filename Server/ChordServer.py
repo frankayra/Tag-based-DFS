@@ -712,7 +712,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
         chord_node_reference = ChordNodeReference(ip=request.ip, port=request.port, id=request.id)
         if self.db_replicas.pop(chord_node_reference, None) and self.replication_forest.pop(chord_node_reference, None):
             return communication_messages.OperationResult(success=True, message=f"Replica eliminada satisfactoriamente")
-        return communication_messages.OperationResult(success=False, message=f"Error al eliminar la replica {e}")
+        return communication_messages.OperationResult(success=False, message=f"Error al eliminar la replica")
 
 
 # Entrada de un nodo a la red
@@ -1310,16 +1310,16 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
                         print("Actualizando lista de next...")
                         assert response.HasField('next_nodes_list')
                         
-                        new_next_list = [ChordNodeReference(id=n.id, ip=n.ip, port=n.port) for n in response.next_nodes_list.references]
+                        new_next_list = [node] + [ChordNodeReference(id=n.id, ip=n.ip, port=n.port) for n in response.next_nodes_list.references]
 
                         self.Fix_Next_List_Failures(new_next_list)
-                        self.any_changes_in_next_list = True
+                        self.any_changes_in_next_list = new_next_list != self.next
                         break
 
                     print("Se detecto un nodo que no responde, intentando recuperar datos...")
 
                     try:
-                        new_next_list = [ChordNodeReference(id=n.id, ip=n.ip, port=n.port) for n in self.chord_client.send_me_your_next_list(node).references]
+                        new_next_list = [node] + [ChordNodeReference(id=n.id, ip=n.ip, port=n.port) for n in self.chord_client.send_me_your_next_list(node).references]
                         
                         self.chord_client.i_am_your_prev(node, self.node_reference.grpc_format)
 
@@ -1340,6 +1340,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
                     if not live_response:
                         print(f"El nodo ({node.id}) no responde a los live requests y no ha enviado heartbeats hace tiempo, se procede a eliminarlo")
                         failed_nodes.append(node)
+                        del last_heartbeat[node]
                 if failed_nodes: self.Manage_Node_Failure(failed_nodes)
         async def heartbeat():
             print("Heartbeat signals started")
@@ -1530,7 +1531,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
                                 )
                             )
                             self.chord_client.update_replication_clique(n, info)
-                            break
+                            # break
                         except grpc.RpcError:
                             print(f"Manage_Node_Failure: fallo en la actualizacion de cliques hacia el nodo ({n.id})")
                             pass
@@ -1722,7 +1723,7 @@ class ChordServer(communication.ChordNetworkCommunicationServicer):
 
         
         # 5) ----------------------------------------
-        if len(new_next_list) <= len(old_next_list) or self.replication_fatcor <= len(old_next_list): return
+        if len(new_next_list) <= len(old_next_list) or self.replication_factor <= len(old_next_list): return
         nodes_to_replicate = new_next_list[len(old_next_list): self.replication_factor]
         for node in nodes_to_replicate: 
             if node in self.replication_forest[self.node_reference]: print("Falta de consistencia en la replicacion")
