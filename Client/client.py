@@ -13,80 +13,87 @@ from gRPC import communication_pb2_grpc as communication
 
 from parser import exec_command, RunPrompt
 
+global address
 ######################### TERMINAL SERVER #########################
 async def actions(action: str, arg1_list, arg2_list):
-    address = 'ds-server:50051' if running_on_docker_container else 'localhost:50051'
-    with grpc.insecure_channel(address) as channel:
-        stub = communication.ClientAPIStub(channel)
-        match action:
-            case 'add':
-                files=[]
-                for file_name in arg1_list:
-                    if not Path(file_name).exists():
-                        print(f"Cliente: No se encontro la ruta al archivo: '{file_name}'.")
-                        continue
-                    with open(file_name, 'rb') as file:
-                        file_content = file.read()
-                        files.append(communication_messages.FileContent(title=file_name, content=file_content))
-                response = stub.addFiles(communication_messages.FilesToAdd(files=files, tags=arg2_list), timeout=2)
-                return f'response.success: {response.success}\nresponse.message: {response.message}'
-            case 'add-tags':
-                response = stub.addTags(communication_messages.TagQuery(tags_query=arg1_list, operation_tags=arg2_list), timeout=2)
-                return f'response.success: {response.success}\nresponse.message: {response.message}'
-            case 'delete':
-                response = stub.delete(communication_messages.TagList(tags=arg1_list), timeout=2)
+    # old ------------------------
+    # address = 'ds-server:50051' if running_on_docker_container else 'localhost:50051'
+    # new ------------------------
+    for i in range(5):
+        address = 'localhost:' + str(50051 +2*i)
+        try:
+            with grpc.insecure_channel(address) as channel:
+                stub = communication.ClientAPIStub(channel)
+                match action:
+                    case 'add':
+                        files=[]
+                        for file_name in arg1_list:
+                            if not Path(file_name).exists():
+                                print(f"Cliente: No se encontro la ruta al archivo: '{file_name}'.")
+                                continue
+                            with open(file_name, 'rb') as file:
+                                file_content = file.read()
+                                files.append(communication_messages.FileContent(title=file_name, content=file_content))
+                        response = stub.addFiles(communication_messages.FilesToAdd(files=files, tags=arg2_list), timeout=2)
+                        return f'response.success: {response.success}\nresponse.message: {response.message}'
+                    case 'add-tags':
+                        response = stub.addTags(communication_messages.TagQuery(tags_query=arg1_list, operation_tags=arg2_list), timeout=2)
+                        return f'response.success: {response.success}\nresponse.message: {response.message}'
+                    case 'delete':
+                        response = stub.delete(communication_messages.TagList(tags=arg1_list), timeout=2)
 
-                return f'response.success: {response.success}\nresponse.message: {response.message}'
-            case 'delete-tags':
-                response = stub.deleteTags(communication_messages.TagQuery(tags_query=arg1_list, operation_tags=arg2_list), timeout=2)
-                return f'response.success: {response.success}\nresponse.message: {response.message}'
+                        return f'response.success: {response.success}\nresponse.message: {response.message}'
+                    case 'delete-tags':
+                        response = stub.deleteTags(communication_messages.TagQuery(tags_query=arg1_list, operation_tags=arg2_list), timeout=2)
+                        return f'response.success: {response.success}\nresponse.message: {response.message}'
 
-               
-                
-            case 'list':
-                print("Listing...")
-                response = stub.list(communication_messages.TagList(tags=arg1_list), timeout=2)
+                    
+                        
+                    case 'list':
+                        print("Listing...")
+                        response = stub.list(communication_messages.TagList(tags=arg1_list), timeout=2)
 
-                result = ""
-                for file_info in response:
-                    if file_info.location.file_hash == "-1":
-                        return "no files found"
-                    cache[file_info.location.file_hash] = (file_info.title, file_info.location.location_hash)
-                    result+=f"{file_info.location.file_hash} -> \"{file_info.title}\"      {file_info.tag_list}\n"
-                return result
-                
-            case 'file-content':
-                file_name, location_hash = cache[arg1_list[0]]
-                
-                if not file_name:
-                    return "No se ha recuperado tal archivo, para acceder a el tene que haber sido recuperado en esta sesion"
+                        result = ""
+                        for file_info in response:
+                            if file_info.location.file_hash == "-1":
+                                return "no files found"
+                            cache[file_info.location.file_hash] = (file_info.title, file_info.location.location_hash)
+                            result+=f"{file_info.location.file_hash} -> \"{file_info.title}\"      {file_info.tag_list}\n"
+                        return result
+                        
+                    case 'file-content':
+                        file_name, location_hash = cache[arg1_list[0]]
+                        
+                        if not file_name:
+                            return "No se ha recuperado tal archivo, para acceder a el tene que haber sido recuperado en esta sesion"
 
-                response = stub.fileContent(communication_messages.FileLocation(file_hash=arg1_list[0], location_hash=location_hash), timeout=2)
-                if not response.title and not response.content:
-                    return f"\nNo se encontro el archivo especificado('{file_name}'), este fue movido o eliminado de la BD."
-                return f"\n   📰: \"{response.title}\" \n{response.content}"
+                        response = stub.fileContent(communication_messages.FileLocation(file_hash=arg1_list[0], location_hash=location_hash), timeout=2)
+                        if not response.title and not response.content:
+                            return f"\nNo se encontro el archivo especificado('{file_name}'), este fue movido o eliminado de la BD."
+                        return f"\n   📰: \"{response.title}\" \n{response.content}"
 
-            case 'cache':
-                os.system('cls')
-                print("\n\nCache --------------------------------")
-                for (file_hash, file_name, file_location_hash) in cache:
-                    print(f"  | > file hash: {file_hash}    name: {file_name}    location hash: {file_location_hash}")
-                print("    -----------------------------------\n")
-                return ""
-            case 'clear-cache':
-                cache.clear()
-                return "Cache cleared successfully"
-            case _:
-                return "No se reconoce el comando"
-            
-
+                    case 'cache':
+                        os.system('cls')
+                        print("\n\nCache --------------------------------")
+                        for (file_hash, file_name, file_location_hash) in cache:
+                            print(f"  | > file hash: {file_hash}    name: {file_name}    location hash: {file_location_hash}")
+                        print("    -----------------------------------\n")
+                        return ""
+                    case 'clear-cache':
+                        cache.clear()
+                        return "Cache cleared successfully"
+                    case _:
+                        return "No se reconoce el comando"
+        except grpc.RpcError as e:
+            continue
 async def RunTerminalClient():
     global cache
     global running_on_docker_container
-    running_on_docker_container_input = input("Estas iniciando desde un contenedor Docker??(Si|No) ")
-    match running_on_docker_container_input.casefold():
-        case "si": running_on_docker_container = True
-        case "no": running_on_docker_container = False
+    # running_on_docker_container_input = input("Estas iniciando desde un contenedor Docker??(Si|No) ")
+    # match running_on_docker_container_input.casefold():
+    #     case "si": running_on_docker_container = True
+    #     case "no": running_on_docker_container = False
+    running_on_docker_container = False
     cache = Cache()
     def wrapped_actions(action:str, arg1_list, arg2_list):
 

@@ -25,6 +25,7 @@ class Operation(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     NODE_ENTRANCE_REQUEST: _ClassVar[Operation]
     UPDATE_FINGER_TABLE: _ClassVar[Operation]
     UPDATE_FINGER_TABLE_FORWARD: _ClassVar[Operation]
+    JUST_CHECKING: _ClassVar[Operation]
 ADD_FILES: Operation
 ADD_TAGS: Operation
 DELETE: Operation
@@ -42,6 +43,7 @@ DELETE_TAGS_FROM_REPLICATED_FILES: Operation
 NODE_ENTRANCE_REQUEST: Operation
 UPDATE_FINGER_TABLE: Operation
 UPDATE_FINGER_TABLE_FORWARD: Operation
+JUST_CHECKING: Operation
 
 class TagList(_message.Message):
     __slots__ = ("tags",)
@@ -102,6 +104,12 @@ class FileGeneralInfo(_message.Message):
 class Empty(_message.Message):
     __slots__ = ()
     def __init__(self) -> None: ...
+
+class NextListRequest(_message.Message):
+    __slots__ = ("next_list_needed",)
+    NEXT_LIST_NEEDED_FIELD_NUMBER: _ClassVar[int]
+    next_list_needed: bool
+    def __init__(self, next_list_needed: bool = ...) -> None: ...
 
 class FileGeneralInfoss(_message.Message):
     __slots__ = ("files_general_info",)
@@ -218,12 +226,14 @@ class FilesToReplicate(_message.Message):
     def __init__(self, files: _Optional[_Union[FilesToAdd, _Mapping]] = ..., location_hash: _Optional[int] = ..., main_replica_node_reference: _Optional[_Union[ChordNodeReference, _Mapping]] = ...) -> None: ...
 
 class RawDatabases(_message.Message):
-    __slots__ = ("db_phisical", "db_references")
+    __slots__ = ("db_phisical", "db_references", "main_replica_node_reference")
     DB_PHISICAL_FIELD_NUMBER: _ClassVar[int]
     DB_REFERENCES_FIELD_NUMBER: _ClassVar[int]
+    MAIN_REPLICA_NODE_REFERENCE_FIELD_NUMBER: _ClassVar[int]
     db_phisical: bytes
     db_references: bytes
-    def __init__(self, db_phisical: _Optional[bytes] = ..., db_references: _Optional[bytes] = ...) -> None: ...
+    main_replica_node_reference: ChordNodeReference
+    def __init__(self, db_phisical: _Optional[bytes] = ..., db_references: _Optional[bytes] = ..., main_replica_node_reference: _Optional[_Union[ChordNodeReference, _Mapping]] = ...) -> None: ...
 
 class FilesToUpdateRequest(_message.Message):
     __slots__ = ("args", "node_reference")
@@ -275,11 +285,23 @@ class FileToTransfer(_message.Message):
     location: FileLocation
     def __init__(self, file: _Optional[_Union[FileContent, _Mapping]] = ..., tags: _Optional[_Iterable[str]] = ..., location: _Optional[_Union[FileLocation, _Mapping]] = ...) -> None: ...
 
+class FileReferenceToTransfer(_message.Message):
+    __slots__ = ("file", "tags", "location_hash")
+    FILE_FIELD_NUMBER: _ClassVar[int]
+    TAGS_FIELD_NUMBER: _ClassVar[int]
+    LOCATION_HASH_FIELD_NUMBER: _ClassVar[int]
+    file: FileReference
+    tags: _containers.RepeatedScalarFieldContainer[str]
+    location_hash: int
+    def __init__(self, file: _Optional[_Union[FileReference, _Mapping]] = ..., tags: _Optional[_Iterable[str]] = ..., location_hash: _Optional[int] = ...) -> None: ...
+
 class FilesAllotmentTransferRequest(_message.Message):
-    __slots__ = ("files",)
+    __slots__ = ("files", "files_references")
     FILES_FIELD_NUMBER: _ClassVar[int]
+    FILES_REFERENCES_FIELD_NUMBER: _ClassVar[int]
     files: _containers.RepeatedCompositeFieldContainer[FileToTransfer]
-    def __init__(self, files: _Optional[_Iterable[_Union[FileToTransfer, _Mapping]]] = ...) -> None: ...
+    files_references: _containers.RepeatedCompositeFieldContainer[FileReferenceToTransfer]
+    def __init__(self, files: _Optional[_Iterable[_Union[FileToTransfer, _Mapping]]] = ..., files_references: _Optional[_Iterable[_Union[FileReferenceToTransfer, _Mapping]]] = ...) -> None: ...
 
 class UpdateReplicationCliqueRequest(_message.Message):
     __slots__ = ("clique", "new_leader", "old_leader")

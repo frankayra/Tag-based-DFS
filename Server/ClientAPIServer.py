@@ -52,7 +52,7 @@ class ClientAPIServer(communication.ClientAPIServicer):
     def check_for_ready_operation(self, id):
         result = None
         start_time = time.time()
-        waiting_time = 3
+        waiting_time = 4
         while(True):
             time.sleep(1)
             # if time.time()-start_time % 2 == 0: print("Esperando resultados....")
@@ -183,6 +183,9 @@ class ClientAPIServer(communication.ClientAPIServicer):
         wait_for_results = self.PushPendingOperation(operation_id=operation_id, operation=communication_messages.ADD_FILES, info=info)
         self.chord_client.succesor(requesting_node=self.chord_server.node_reference, node_reference=self.chord_server.next[0], searching_id=random_selected_tag_hash, requested_operation=communication_messages.ADD_FILES, operation_id=operation_id)
         results = wait_for_results()
+
+        # assigned_node = self.chord_server.find_successor(random_selected_tag_hash)
+        # results = self.chord_server.RetakePendingOperation(assigned_node, communication_messages.ADD_FILES, info)
 
 
         if isinstance(results, Exception):

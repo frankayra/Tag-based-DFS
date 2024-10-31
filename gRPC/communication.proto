@@ -74,7 +74,7 @@ service ChordNetworkCommunication{
 
     
     rpc heartbeat (ChordNodeReference) returns (Empty);
-    rpc alive_request (Empty) returns (LiveAnswer);
+    rpc alive_request (NextListRequest) returns (LiveAnswer);
     rpc unreplicate (ChordNodeReference) returns (OperationResult);
     
     rpc node_entrance_request (NodeEntranceRequest) returns (OperationResult);
@@ -90,6 +90,9 @@ service ChordNetworkCommunication{
     rpc send_me_your_next_list (Empty) returns (ChordNodeReferences);
 }
 message Empty {}
+message NextListRequest {
+    bool next_list_needed = 1;
+}
 
 message FileGeneralInfoss {
     repeated FileGeneralInfo files_general_info = 1;
@@ -113,6 +116,7 @@ enum Operation {
     NODE_ENTRANCE_REQUEST = 14;
     UPDATE_FINGER_TABLE = 15;
     UPDATE_FINGER_TABLE_FORWARD = 16;
+    JUST_CHECKING = 17;
 }
 message ServerID {
     int32 serverID = 1;
@@ -175,6 +179,7 @@ message FilesToReplicate {
 message RawDatabases {
     bytes db_phisical = 1;
     bytes db_references = 2;
+    ChordNodeReference main_replica_node_reference = 3;
 }
 message FilesToUpdateRequest {
     UpdateRequestArguments args = 1;
@@ -201,8 +206,14 @@ message FileToTransfer {
     repeated string tags = 2;
     FileLocation location = 3;
 }
+message FileReferenceToTransfer {
+    FileReference file = 1;
+    repeated string tags = 2;
+    int32 location_hash = 3;
+}
 message FilesAllotmentTransferRequest {
     repeated FileToTransfer files = 1;
+    repeated FileReferenceToTransfer files_references = 2;
 }
 message UpdateReplicationCliqueRequest{
     ChordNodeReferences clique = 1;

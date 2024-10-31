@@ -415,7 +415,7 @@ class ChordNetworkCommunicationStub(object):
                 _registered_method=True)
         self.alive_request = channel.unary_unary(
                 '/TagBasedFileSystem.ChordNetworkCommunication/alive_request',
-                request_serializer=communication__pb2.Empty.SerializeToString,
+                request_serializer=communication__pb2.NextListRequest.SerializeToString,
                 response_deserializer=communication__pb2.LiveAnswer.FromString,
                 _registered_method=True)
         self.unreplicate = channel.unary_unary(
@@ -744,7 +744,7 @@ def add_ChordNetworkCommunicationServicer_to_server(servicer, server):
             ),
             'alive_request': grpc.unary_unary_rpc_method_handler(
                     servicer.alive_request,
-                    request_deserializer=communication__pb2.Empty.FromString,
+                    request_deserializer=communication__pb2.NextListRequest.FromString,
                     response_serializer=communication__pb2.LiveAnswer.SerializeToString,
             ),
             'unreplicate': grpc.unary_unary_rpc_method_handler(
@@ -1311,7 +1311,7 @@ class ChordNetworkCommunication(object):
             request,
             target,
             '/TagBasedFileSystem.ChordNetworkCommunication/alive_request',
-            communication__pb2.Empty.SerializeToString,
+            communication__pb2.NextListRequest.SerializeToString,
             communication__pb2.LiveAnswer.FromString,
             options,
             channel_credentials,

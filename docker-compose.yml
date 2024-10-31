@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  ds-server-principal:
+  ds-server-1:
     build: .
     ports:
       - "50051:50051"  # Ajusta el puerto según tu aplicación
